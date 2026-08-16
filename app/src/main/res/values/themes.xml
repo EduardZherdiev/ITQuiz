@@ -1,0 +1,35 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.Quiz" parent="Theme.Material3.DayNight">
+        <!-- Customize your light theme here. -->
+        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Must match the root backgrounds during locale Activity recreation. -->
+        <item name="android:windowBackground">@color/screen_background</item>
+        <item name="android:statusBarColor">@color/screen_background</item>
+        <item name="android:navigationBarColor">@color/screen_background</item>
+        <item name="android:windowAnimationStyle">@style/QuizWindowAnimation</item>
+        <item name="android:windowDisablePreview">false</item>
+    </style>
+
+    <style name="QuizWindowAnimation">
+        <item name="android:windowEnterAnimation">@anim/quiz_window_noop</item>
+        <item name="android:windowExitAnimation">@anim/quiz_window_noop</item>
+        <item name="android:windowShowAnimation">@anim/quiz_window_noop</item>
+        <item name="android:windowHideAnimation">@anim/quiz_window_noop</item>
+    </style>
+
+    <style name="Theme.Quiz" parent="Base.Theme.Quiz" />
+
+    <style name="Theme.Quiz.Settings" parent="Theme.Quiz">
+        <item name="android:windowBackground">@color/screen_background</item>
+        <item name="android:windowDisablePreview">false</item>
+        <item name="android:windowAnimationStyle">@style/QuizWindowAnimation</item>
+    </style>
+
+    <style name="Theme.Quiz.Startup" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/screen_background</item>
+        <item name="android:statusBarColor">@color/screen_background</item>
+        <item name="android:navigationBarColor">@color/screen_background</item>
+        <item name="android:windowAnimationStyle">@style/QuizWindowAnimation</item>
+    </style>
+</resources>

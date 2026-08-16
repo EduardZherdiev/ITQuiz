@@ -1,0 +1,36 @@
+databases:
+  - name: quiz-db
+    plan: free
+    region: frankfurt
+    databaseName: quiz
+    user: quiz
+
+services:
+  - type: web
+    name: quiz-server
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: quizServer
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: quiz-db
+          property: connectionString
+      - key: QUIZ_AUTH_SECRET
+        generateValue: true
+      - key: QUIZ_RESET_DB_ON_STARTUP
+        value: "0"
+      - key: QUIZ_ENABLE_TEST_TOPUPS
+        value: "0"
+      - key: QUIZ_ALLOWED_ORIGINS
+        value: "*"
+      - key: GOOGLE_PLAY_PACKAGE_NAME
+        value: com.maxim.quiz
+      - key: QUIZ_REWARDED_AD_UNIT_ID
+        sync: false
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_FILE
+        sync: false

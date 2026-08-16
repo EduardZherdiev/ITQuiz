@@ -1,0 +1,101 @@
+TOPIC_TRANSLATIONS = {
+    "en": {
+        "AI": ("ARTIFICIAL INTELLIGENCE", "AI", "Models, learning and automation"),
+        "ALL": ("ALL TOPICS", "ALL", "General knowledge across IT topics"),
+        "ALGO": ("ALGORITHMS", "ALGO", "Steps, complexity and problem solving"),
+        "ARCH": ("ARCHITECTURE", "ARCH", "Systems, services and software design"),
+        "C": ("C", "C", "Syntax, memory and low-level code"),
+        "CPP": ("C++", "C++", "OOP, templates and the standard library"),
+        "CSHARP": ("C#", "C#", ".NET types, LINQ and async code"),
+        "DB": ("DATABASES", "DB", "Tables, joins and relational models"),
+        "JAVA": ("JAVA", "JAVA", "OOP, collections and concurrency"),
+        "JS": ("JAVASCRIPT", "JS", "Browser code, events and promises"),
+        "MATH": ("MATHEMATICS", "MATH", "Logic, probability and graphs"),
+        "NET": ("NETWORKING", "NET", "TCP, HTTP, routing and DNS"),
+        "OS": ("OPERATING SYSTEMS", "OS", "Processes, memory and files"),
+        "PY": ("PYTHON", "PY", "Syntax, lists, functions and modules"),
+        "SQL": ("SQL", "SQL", "Queries, joins and filtering"),
+    },
+    "ru": {
+        "AI": ("ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ", "AI", "Модели, обучение и автоматизация"),
+        "ALL": ("ВСЕ ТЕМЫ", "ALL", "Общие знания в области IT"),
+        "ALGO": ("АЛГОРИТМЫ", "ALGO", "Шаги, сложность и решение задач"),
+        "ARCH": ("АРХИТЕКТУРА", "ARCH", "Системы, сервисы и дизайн ПО"),
+        "C": ("ЯЗЫК C", "C", "Синтаксис, память и низкоуровневый код"),
+        "CPP": ("C++", "C++", "ООП, шаблоны и стандартная библиотека"),
+        "CSHARP": ("C#", "C#", "Типы .NET, LINQ и асинхронный код"),
+        "DB": ("БАЗЫ ДАННЫХ", "DB", "Таблицы, связи и реляционные модели"),
+        "JAVA": ("JAVA", "JAVA", "ООП, коллекции и многопоточность"),
+        "JS": ("JAVASCRIPT", "JS", "Браузерный код, события и промисы"),
+        "MATH": ("МАТЕМАТИКА", "MATH", "Логика, вероятность и графы"),
+        "NET": ("СЕТИ", "NET", "TCP, HTTP, маршрутизация и DNS"),
+        "OS": ("ОПЕРАЦИОННЫЕ СИСТЕМЫ", "OS", "Процессы, память и файлы"),
+        "PY": ("PYTHON", "PY", "Синтаксис, списки, функции и модули"),
+        "SQL": ("SQL", "SQL", "Запросы, связи и фильтрация"),
+    },
+    "uk": {
+        "AI": ("ШТУЧНИЙ ІНТЕЛЕКТ", "AI", "Моделі, навчання й автоматизація"),
+        "ALL": ("УСІ ТЕМИ", "ALL", "Загальні знання у сфері IT"),
+        "ALGO": ("АЛГОРИТМИ", "ALGO", "Кроки, складність і розв’язання задач"),
+        "ARCH": ("АРХІТЕКТУРА", "ARCH", "Системи, сервіси та дизайн ПЗ"),
+        "C": ("МОВА C", "C", "Синтаксис, пам’ять і низькорівневий код"),
+        "CPP": ("C++", "C++", "ООП, шаблони та стандартна бібліотека"),
+        "CSHARP": ("C#", "C#", "Типи .NET, LINQ та асинхронний код"),
+        "DB": ("БАЗИ ДАНИХ", "DB", "Таблиці, зв’язки та реляційні моделі"),
+        "JAVA": ("JAVA", "JAVA", "ООП, колекції та багатопотоковість"),
+        "JS": ("JAVASCRIPT", "JS", "Браузерний код, події та проміси"),
+        "MATH": ("МАТЕМАТИКА", "MATH", "Логіка, ймовірність і графи"),
+        "NET": ("МЕРЕЖІ", "NET", "TCP, HTTP, маршрутизація та DNS"),
+        "OS": ("ОПЕРАЦІЙНІ СИСТЕМИ", "OS", "Процеси, пам’ять і файли"),
+        "PY": ("PYTHON", "PY", "Синтаксис, списки, функції та модулі"),
+        "SQL": ("SQL", "SQL", "Запити, зв’язки та фільтрація"),
+    },
+}
+
+FACT_TRANSLATIONS = {
+    "ru": {
+        "machine learning": "машинное обучение", "neural networks": "нейронные сети", "training data": "данные для обучения", "inference": "инференс", "automation": "автоматизация",
+        "overview": "обзор", "fundamentals": "основы", "categories": "категории", "comparison": "сравнение", "context": "контекст",
+        "steps": "этапы", "complexity": "сложность", "correctness": "корректность", "sorting": "сортировка", "searching": "поиск",
+        "layers": "слои", "services": "сервисы", "scalability": "масштабируемость", "components": "компоненты", "boundaries": "границы",
+        "pointers": "указатели", "arrays": "массивы", "memory": "память", "headers": "заголовочные файлы", "compilation": "компиляция",
+        "classes": "классы", "templates": "шаблоны", "references": "ссылки", "RAII": "RAII", "STL": "STL",
+        "properties": "свойства", "LINQ": "LINQ", "delegates": "делегаты", "namespaces": "пространства имён", "async": "асинхронность",
+        "tables": "таблицы", "indexes": "индексы", "joins": "соединения", "transactions": "транзакции", "normalization": "нормализация",
+        "class": "классы", "JVM": "JVM", "collections": "коллекции", "exceptions": "исключения", "threads": "потоки",
+        "functions": "функции", "objects": "объекты", "promises": "промисы", "events": "события", "DOM": "DOM",
+        "logic": "логика", "sets": "множества", "probability": "вероятность", "graphs": "графы", "proofs": "доказательства",
+        "TCP": "TCP", "HTTP": "HTTP", "routing": "маршрутизация", "packets": "пакеты", "DNS": "DNS",
+        "processes": "процессы", "scheduling": "планирование", "files": "файлы",
+        "indentation": "отступы", "lists": "списки", "modules": "модули", "virtual environments": "виртуальные окружения",
+        "SELECT": "SELECT", "WHERE": "WHERE", "JOIN": "JOIN", "GROUP BY": "GROUP BY",
+    },
+    "uk": {
+        "machine learning": "машинне навчання", "neural networks": "нейронні мережі", "training data": "дані для навчання", "inference": "інференс", "automation": "автоматизація",
+        "overview": "огляд", "fundamentals": "основи", "categories": "категорії", "comparison": "порівняння", "context": "контекст",
+        "steps": "етапи", "complexity": "складність", "correctness": "коректність", "sorting": "сортування", "searching": "пошук",
+        "layers": "шари", "services": "сервіси", "scalability": "масштабованість", "components": "компоненти", "boundaries": "межі",
+        "pointers": "вказівники", "arrays": "масиви", "memory": "пам’ять", "headers": "заголовкові файли", "compilation": "компіляція",
+        "classes": "класи", "templates": "шаблони", "references": "посилання", "RAII": "RAII", "STL": "STL",
+        "properties": "властивості", "LINQ": "LINQ", "delegates": "делегати", "namespaces": "простори імен", "async": "асинхронність",
+        "tables": "таблиці", "indexes": "індекси", "joins": "з’єднання", "transactions": "транзакції", "normalization": "нормалізація",
+        "class": "класи", "JVM": "JVM", "collections": "колекції", "exceptions": "винятки", "threads": "потоки",
+        "functions": "функції", "objects": "об’єкти", "promises": "проміси", "events": "події", "DOM": "DOM",
+        "logic": "логіка", "sets": "множини", "probability": "ймовірність", "graphs": "графи", "proofs": "доведення",
+        "TCP": "TCP", "HTTP": "HTTP", "routing": "маршрутизація", "packets": "пакети", "DNS": "DNS",
+        "processes": "процеси", "scheduling": "планування", "files": "файли",
+        "indentation": "відступи", "lists": "списки", "modules": "модулі", "virtual environments": "віртуальні середовища",
+        "SELECT": "SELECT", "WHERE": "WHERE", "JOIN": "JOIN", "GROUP BY": "GROUP BY",
+    },
+}
+
+
+def localized_topic(code: str, language: str, fallback_title: str, fallback_abbr: str, fallback_description: str) -> tuple[str, str, str]:
+    return TOPIC_TRANSLATIONS.get(language, {}).get(
+        code,
+        (fallback_title, fallback_abbr, fallback_description),
+    )
+
+
+def localized_fact(fact: str, language: str) -> str:
+    return FACT_TRANSLATIONS.get(language, {}).get(fact, fact)

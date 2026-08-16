@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/currencyTopValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="16sp"
+        tools:text="3500" />
+
+    <ImageView
+        android:id="@+id/currencyIconButton"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@string/game_mode_currency_title"
+        android:src="@drawable/coin" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/currencyAddButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:insetLeft="0dp"
+        android:insetTop="0dp"
+        android:insetRight="0dp"
+        android:insetBottom="0dp"
+        android:minWidth="36dp"
+        android:minHeight="36dp"
+        android:padding="0dp"
+        android:text="@string/currency_add_plus"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="24sp"
+        app:backgroundTint="@android:color/transparent"
+        app:cornerRadius="10dp"
+        app:rippleColor="?attr/colorPrimary"
+        app:strokeColor="?attr/colorPrimary"
+        app:strokeWidth="3dp" />
+
+</LinearLayout>

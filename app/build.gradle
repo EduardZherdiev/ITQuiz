@@ -1,0 +1,73 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+def quizApiBaseUrl = project.findProperty("QUIZ_API_BASE_URL") ?: "http://10.0.2.2:8000/"
+def admobAppId = project.findProperty("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713"
+def rewardedAdUnitId = project.findProperty("REWARDED_AD_UNIT_ID") ?: "ca-app-pub-3940256099942544/5224354917"
+def rewardedServerSource = project.findProperty("REWARDED_SERVER_SOURCE")
+
+android {
+    namespace 'com.maxim.quiz'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.maxim.quiz"
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "REWARDED_SERVER_SOURCE", '"' + (rewardedServerSource ?: "ad_test") + '"'
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "REWARDED_SERVER_SOURCE", '"' + (rewardedServerSource ?: "ad_ssv") + '"'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+
+    defaultConfig {
+        buildConfigField "String", "QUIZ_API_BASE_URL", '"' + quizApiBaseUrl + '"'
+        buildConfigField "String", "ADMOB_APP_ID", '"' + admobAppId + '"'
+        buildConfigField "String", "REWARDED_AD_UNIT_ID", '"' + rewardedAdUnitId + '"'
+        manifestPlaceholders = [admobAppId: admobAppId]
+    }
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.activity
+    implementation libs.constraintlayout
+    implementation libs.annotation
+    implementation libs.lifecycle.livedata.ktx
+    implementation libs.lifecycle.viewmodel.ktx
+    implementation libs.preference
+    implementation libs.recyclerview
+    implementation libs.cardview
+    implementation libs.legacy.support.v4
+    implementation libs.room.runtime
+    annotationProcessor libs.room.compiler
+    implementation libs.retrofit
+    implementation libs.retrofit.converter.gson
+    implementation libs.okhttp.logging.interceptor
+    implementation libs.google.mobile.ads
+    implementation libs.play.billing
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+}

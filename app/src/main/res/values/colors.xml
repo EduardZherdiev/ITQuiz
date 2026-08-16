@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="screen_background">#FFF3F4F6</color>
+    <color name="topic_card_background">#FFFFFFFF</color>
+    <color name="review_correct_background_day">#FFDFF3E3</color>
+    <color name="review_incorrect_background_day">#FFF8D7DA</color>
+    <color name="review_correct_background_night">#FF1E4D2B</color>
+    <color name="review_incorrect_background_night">#FF6A1F24</color>
+</resources>

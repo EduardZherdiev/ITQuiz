@@ -1,0 +1,194 @@
+package com.maxim.quiz.data.local.dao;
+
+import androidx.lifecycle.LiveData;
+import androidx.room.Dao;
+import androidx.room.Insert;
+import androidx.room.OnConflictStrategy;
+import androidx.room.Query;
+import androidx.room.Transaction;
+
+import com.maxim.quiz.data.local.entity.OptionEntity;
+import com.maxim.quiz.data.local.entity.OptionTextEntity;
+import com.maxim.quiz.data.local.entity.AssetEntity;
+import com.maxim.quiz.data.local.entity.QuestionEntity;
+import com.maxim.quiz.data.local.entity.QuestionTextEntity;
+import com.maxim.quiz.data.local.entity.QuizSessionEntity;
+import com.maxim.quiz.data.local.entity.CurrencyTransactionEntity;
+import com.maxim.quiz.data.local.entity.TopicEntity;
+import com.maxim.quiz.data.local.entity.TopicTextEntity;
+import com.maxim.quiz.data.local.entity.UserAssetEntity;
+import com.maxim.quiz.data.local.entity.UserEntity;
+import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
+import com.maxim.quiz.data.local.model.TopicCardRow;
+
+import java.util.List;
+
+@Dao
+public interface QuizDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertTopics(List<TopicEntity> topics);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertTopicTexts(List<TopicTextEntity> topicTexts);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertQuestions(List<QuestionEntity> questions);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertQuestionTexts(List<QuestionTextEntity> questionTexts);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertOptions(List<OptionEntity> options);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertOptionTexts(List<OptionTextEntity> optionTexts);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertAssets(List<AssetEntity> assets);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertUserAssets(List<UserAssetEntity> userAssets);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertUserAsset(UserAssetEntity userAsset);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertCurrencyTransactions(List<CurrencyTransactionEntity> transactions);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertUser(UserEntity user);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertSession(QuizSessionEntity session);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertSessions(List<QuizSessionEntity> sessions);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertOfflineQuizSession(OfflineQuizSessionEntity session);
+
+    @Query("SELECT * FROM offline_quiz_sessions WHERE id = :sessionId LIMIT 1")
+    OfflineQuizSessionEntity getOfflineQuizSession(String sessionId);
+
+    @Query("SELECT * FROM offline_quiz_sessions WHERE state IN ('COMPLETED_PENDING', 'CANCEL_PENDING', 'REMOTE_FINISH_PENDING', 'REMOTE_CANCEL_PENDING') ORDER BY started_at")
+    List<OfflineQuizSessionEntity> getPendingOfflineQuizSessions();
+
+    @Query("UPDATE offline_quiz_sessions SET remote_session_id = :remoteSessionId WHERE id = :sessionId")
+    void setOfflineRemoteSessionId(String sessionId, String remoteSessionId);
+
+    @Query("DELETE FROM offline_quiz_sessions WHERE id = :sessionId")
+    void deleteOfflineQuizSession(String sessionId);
+
+    @Query("UPDATE users SET currency_balance = :balance WHERE id = :userId")
+    void updateUserCurrencyBalance(String userId, int balance);
+
+    @Query("UPDATE users SET display_name = :displayName WHERE id = :userId")
+    void updateUserDisplayName(String userId, String displayName);
+
+    @Query("UPDATE users SET last_login_at = :lastLoginAt WHERE id = :userId")
+    void updateUserLastLoginAt(String userId, long lastLoginAt);
+
+    @Query("SELECT COUNT(*) FROM topics")
+    int countTopics();
+
+    @Query("SELECT COUNT(*) FROM questions")
+    int countQuestions();
+
+    @Query("SELECT COUNT(*) FROM options")
+    int countOptions();
+
+    @Query("SELECT COUNT(*) FROM users")
+    int countUsers();
+
+    @Query("SELECT COUNT(*) FROM assets")
+    int countAssets();
+
+    @Query("SELECT COUNT(*) FROM user_assets")
+    int countUserAssets();
+
+    @Query("SELECT COUNT(*) FROM currency_transactions")
+    int countCurrencyTransactions();
+
+    @Query("SELECT COUNT(*) FROM quiz_sessions")
+    int countQuizSessions();
+
+    @Query("SELECT t.* FROM topics t WHERE t.is_active = 1 ORDER BY t.code")
+    LiveData<List<TopicEntity>> observeActiveTopics();
+
+    @Query("SELECT t.id AS topicId, t.code AS code, t.icon_url AS iconUrl, COALESCE(tt.title, t.code) AS title, COALESCE(tt.description, '') AS description, COALESCE(tt.abbr, t.code) AS abbr FROM topics t LEFT JOIN topic_texts tt ON tt.topic_id = t.id AND tt.language_code = :lang WHERE t.is_active = 1 ORDER BY t.code")
+    LiveData<List<TopicCardRow>> observeTopicCards(String lang);
+
+    @Query("SELECT * FROM topics WHERE is_active = 1 ORDER BY code")
+    List<TopicEntity> getActiveTopics();
+
+    @Query("SELECT qt.* FROM question_texts qt INNER JOIN questions q ON q.id = qt.question_id WHERE q.topic_id = :topicId AND q.difficulty = :difficulty AND qt.language_code = :lang AND q.is_active = 1 ORDER BY q.id")
+    List<QuestionTextEntity> getQuestionTextsByTopicAndDifficulty(String topicId, int difficulty, String lang);
+
+    @Query("SELECT * FROM options WHERE question_id = :questionId")
+    List<OptionEntity> getOptionsByQuestionId(String questionId);
+
+    @Query("SELECT * FROM option_texts WHERE option_id = :optionId AND language_code = :lang LIMIT 1")
+    OptionTextEntity getOptionText(String optionId, String lang);
+
+    @Query("SELECT * FROM assets")
+    List<AssetEntity> getAllAssets();
+
+    @Query("SELECT * FROM assets WHERE id = :assetId LIMIT 1")
+    AssetEntity getAssetById(String assetId);
+
+    @Query("SELECT * FROM user_assets WHERE user_id = :userId")
+    List<UserAssetEntity> getUserAssets(String userId);
+
+    @Query("UPDATE user_assets SET selected = 0 WHERE user_id = :userId AND asset_id IN (SELECT id FROM assets WHERE asset_type = :assetType)")
+    void clearSelectedForUserAndType(String userId, String assetType);
+
+    @Query("SELECT * FROM users WHERE id = :userId LIMIT 1")
+    UserEntity getUserById(String userId);
+
+    @Query("SELECT qt.* FROM question_texts qt INNER JOIN questions q ON q.id = qt.question_id WHERE q.topic_id = :topicId AND q.difficulty = :difficulty AND qt.language_code = :lang AND q.is_active = 1 ORDER BY q.id")
+    LiveData<List<QuestionTextEntity>> observeQuestionTextsByTopicAndDifficulty(String topicId, int difficulty, String lang);
+
+    @Query("SELECT * FROM topic_texts WHERE topic_id = :topicId AND language_code = :lang LIMIT 1")
+    TopicTextEntity getTopicText(String topicId, String lang);
+
+    @Query("UPDATE user_assets SET selected = 1 WHERE user_id = :userId AND asset_id = :assetId")
+    void selectAsset(String userId, String assetId);
+
+    @Query("DELETE FROM option_texts")
+    void clearOptionTexts();
+
+    @Query("DELETE FROM options")
+    void clearOptions();
+
+    @Query("DELETE FROM question_texts")
+    void clearQuestionTextsForSync();
+
+    @Query("DELETE FROM questions")
+    void clearQuestions();
+
+    @Query("DELETE FROM topic_texts")
+    void clearTopicTexts();
+
+    @Query("DELETE FROM topics")
+    void clearTopics();
+
+    @Query("DELETE FROM user_assets")
+    void clearUserAssets();
+
+    @Query("DELETE FROM currency_transactions")
+    void clearCurrencyTransactions();
+
+    @Query("DELETE FROM quiz_sessions")
+    void clearQuizSessions();
+
+    @Query("DELETE FROM assets")
+    void clearAssets();
+
+    @Query("DELETE FROM users")
+    void clearUsers();
+
+    @Transaction
+    @Query("DELETE FROM question_texts")
+    void clearQuestionTexts();
+}
