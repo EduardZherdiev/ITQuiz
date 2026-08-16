@@ -168,7 +168,23 @@ def seed_database(session: Session) -> None:
                                 client_session_id=None,
                                 started_at=now - 600000, finished_at=now - 300000)]
 
-        session.add_all(topics + topic_texts + questions + question_texts + options + option_texts + assets)
+        # PostgreSQL enforces foreign keys during the flush.  The models do
+        # not declare ORM relationships, so SQLAlchemy cannot infer the
+        # insert order from the ForeignKey columns alone.  Insert each level
+        # explicitly to keep the seed portable between SQLite and PostgreSQL.
+        session.add_all(topics + topic_texts + assets)
+        session.flush()
+
+        session.add_all(questions)
+        session.flush()
+
+        session.add_all(question_texts)
+        session.flush()
+
+        session.add_all(options)
+        session.flush()
+
+        session.add_all(option_texts)
         session.add(user)
         session.flush()
         session.add_all(user_assets + transactions + sessions)
