@@ -132,6 +132,15 @@ public interface QuizDao {
     @Query("SELECT COUNT(*) FROM quiz_sessions")
     int countQuizSessions();
 
+    @Query("SELECT COUNT(*) FROM topic_texts WHERE language_code = :language")
+    int countTopicTextsForLanguage(String language);
+
+    @Query("SELECT COUNT(*) FROM question_texts WHERE language_code = :language")
+    int countQuestionTextsForLanguage(String language);
+
+    @Query("SELECT COUNT(*) FROM option_texts WHERE language_code = :language")
+    int countOptionTextsForLanguage(String language);
+
     @Query("SELECT t.* FROM topics t WHERE t.is_active = 1 ORDER BY t.code")
     LiveData<List<TopicEntity>> observeActiveTopics();
 
@@ -192,11 +201,29 @@ public interface QuizDao {
     @Query("DELETE FROM topic_texts WHERE language_code != :language")
     void deleteTopicTextsExcept(String language);
 
+    @Query("DELETE FROM topic_texts WHERE language_code NOT IN (:languages)")
+    void deleteTopicTextsExceptLanguages(List<String> languages);
+
+    @Query("DELETE FROM topic_texts WHERE language_code = :language")
+    void clearTopicTextsForLanguage(String language);
+
     @Query("DELETE FROM question_texts WHERE language_code != :language")
     void deleteQuestionTextsExcept(String language);
 
+    @Query("DELETE FROM question_texts WHERE language_code NOT IN (:languages)")
+    void deleteQuestionTextsExceptLanguages(List<String> languages);
+
+    @Query("DELETE FROM question_texts WHERE language_code = :language")
+    void clearQuestionTextsForLanguage(String language);
+
     @Query("DELETE FROM option_texts WHERE language_code != :language")
     void deleteOptionTextsExcept(String language);
+
+    @Query("DELETE FROM option_texts WHERE language_code NOT IN (:languages)")
+    void deleteOptionTextsExceptLanguages(List<String> languages);
+
+    @Query("DELETE FROM option_texts WHERE language_code = :language")
+    void clearOptionTextsForLanguage(String language);
 
     @Query("DELETE FROM topics")
     void clearTopics();

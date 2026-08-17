@@ -33,10 +33,13 @@ import androidx.preference.PreferenceManager;
 
 import java.util.ArrayList;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.UUID;
@@ -135,6 +138,41 @@ public class QuizRepository {
         syncBootstrapAsync(lang, null);
     }
 
+    /** Synchronous catalog download used by the settings language gate. */
+    public void syncBootstrapBlocking(String language) throws Exception {
+        if (remoteDataSource == null || quizDatabase == null || appContext == null) {
+            throw new IllegalStateException("Repository was created without remote sync support");
+        }
+        if (!NetworkState.isAvailable()) {
+            throw new IOException("Network is unavailable");
+        }
+        syncOfflineSessionsBlocking();
+        syncPendingAssetOperationsBlocking();
+        BootstrapBundle bundle = fetchBootstrapBundle(language);
+        quizDatabase.runInTransaction(() -> prepareLanguageCache(bundle.languages));
+        quizDatabase.runInTransaction(() -> {
+            saveBootstrapTopics(bundle.primary);
+            if (bundle.english != bundle.primary) {
+                saveBootstrapTopics(bundle.english);
+            }
+            saveBootstrapAssets(bundle.primary);
+            saveBootstrapQuestions(bundle.primary);
+            if (bundle.english != bundle.primary) {
+                saveBootstrapQuestions(bundle.english);
+            }
+        });
+    }
+
+    public boolean isLanguageCached(String language) {
+        if (quizDatabase == null) {
+            return false;
+        }
+        String normalized = normalizeLanguage(language);
+        return quizDao.countTopicTextsForLanguage(normalized) > 0
+                && quizDao.countQuestionTextsForLanguage(normalized) > 0
+                && quizDao.countOptionTextsForLanguage(normalized) > 0;
+    }
+
     public boolean isBootstrapSyncInProgress(String lang) {
         String requestedLanguage = lang == null || lang.isEmpty() ? "en" : lang;
         synchronized (SYNC_LOCK) {
@@ -150,7 +188,7 @@ public class QuizRepository {
             return;
         }
 
-        SyncRequest request = new SyncRequest(this, lang == null || lang.isEmpty() ? "en" : lang, callback);
+        SyncRequest request = new SyncRequest(this, normalizeLanguage(lang), callback);
         synchronized (SYNC_LOCK) {
             if (syncInProgress) {
                 if (request.language.equals(activeSyncLanguage)) {
@@ -180,7 +218,7 @@ public class QuizRepository {
             return;
         }
 
-        SyncRequest request = new SyncRequest(this, lang == null || lang.isEmpty() ? "en" : lang, callback);
+        SyncRequest request = new SyncRequest(this, normalizeLanguage(lang), callback);
         synchronized (SYNC_LOCK) {
             if (syncInProgress) {
                 if (request.language.equals(activeSyncLanguage)) {
@@ -243,17 +281,33 @@ public class QuizRepository {
 
     /** Flushes locally completed asset actions when the connection returns. */
     public void syncPendingAssetOperationsAsync() {
+        syncPendingAssetOperationsAsync(null);
+    }
+
+    public void syncPendingAssetOperationsAsync(SyncCallback callback) {
         if (remoteDataSource == null || quizDatabase == null || appContext == null || !NetworkState.isAvailable()) {
+            if (callback != null) {
+                callback.onError(new IOException("Network is unavailable"));
+            }
             return;
         }
         ioExecutor.execute(() -> {
             if (!ASSET_SYNC_LOCK.tryLock()) {
+                if (callback != null) {
+                    callback.onError(new IOException("Asset sync is already in progress"));
+                }
                 return;
             }
             try {
                 syncPendingAssetOperations();
+                if (callback != null) {
+                    callback.onSuccess();
+                }
             } catch (Exception error) {
                 android.util.Log.w("QuizRepository", "Asset operation sync will retry", error);
+                if (callback != null) {
+                    callback.onError(error);
+                }
             } finally {
                 ASSET_SYNC_LOCK.unlock();
             }
@@ -282,24 +336,43 @@ public class QuizRepository {
         request.repository.ioExecutor.execute(() -> {
             Throwable failure = null;
             try {
+                // A server refresh must settle local actions first. Otherwise
+                // an old bootstrap response could overwrite a just-created
+                // offline purchase with the previous ownership and balance.
+                request.repository.syncOfflineSessionsBlocking();
+                request.repository.syncPendingAssetOperationsBlocking();
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.CONNECTING, "connecting");
                     request.flowCallback.awaitNext();
                 }
-                BootstrapDto bootstrap = request.repository.fetchBootstrapWithRetries(request.language);
-                final BootstrapDto syncedBootstrap = bootstrap;
-                request.repository.quizDatabase.runInTransaction(request.repository::clearServerData);
-                request.repository.quizDatabase.runInTransaction(() -> request.repository.saveBootstrapTopics(syncedBootstrap));
+                BootstrapBundle bundle = request.repository.fetchBootstrapBundle(request.language);
+                final BootstrapBundle syncedBundle = bundle;
+                request.repository.quizDatabase.runInTransaction(
+                        () -> request.repository.prepareLanguageCache(syncedBundle.languages)
+                );
+                request.repository.quizDatabase.runInTransaction(() -> {
+                    request.repository.saveBootstrapTopics(syncedBundle.primary);
+                    if (syncedBundle.english != syncedBundle.primary) {
+                        request.repository.saveBootstrapTopics(syncedBundle.english);
+                    }
+                });
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.TOPICS_READY, "topics ready");
                     request.flowCallback.awaitNext();
                 }
-                request.repository.quizDatabase.runInTransaction(() -> request.repository.saveBootstrapAssets(syncedBootstrap));
+                request.repository.quizDatabase.runInTransaction(
+                        () -> request.repository.saveBootstrapAssets(syncedBundle.primary)
+                );
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.ASSETS_READY, "assets ready");
                     request.flowCallback.awaitNext();
                 }
-                request.repository.quizDatabase.runInTransaction(() -> request.repository.saveBootstrapQuestions(syncedBootstrap));
+                request.repository.quizDatabase.runInTransaction(() -> {
+                    request.repository.saveBootstrapQuestions(syncedBundle.primary);
+                    if (syncedBundle.english != syncedBundle.primary) {
+                        request.repository.saveBootstrapQuestions(syncedBundle.english);
+                    }
+                });
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.QUESTIONS_READY, "questions ready");
                     request.flowCallback.awaitNext();
@@ -309,6 +382,65 @@ public class QuizRepository {
             }
             completeBootstrapSync(failure);
         });
+    }
+
+    /** Downloads the requested language and English in parallel. */
+    private BootstrapBundle fetchBootstrapBundle(String language) throws Exception {
+        String normalized = normalizeLanguage(language);
+        if ("en".equals(normalized)) {
+            BootstrapDto english = fetchBootstrapWithRetries("en");
+            return new BootstrapBundle(english, english, Arrays.asList("en"));
+        }
+
+        // Authenticate once before starting the two parallel downloads. This
+        // avoids two anonymous users being created for the same device during
+        // the first dual-language bootstrap.
+        authenticateIfNeeded();
+        ExecutorService parallel = Executors.newFixedThreadPool(2);
+        try {
+            Future<BootstrapDto> primaryFuture = parallel.submit(
+                    () -> fetchBootstrapWithRetries(normalized)
+            );
+            Future<BootstrapDto> englishFuture = parallel.submit(
+                    () -> fetchBootstrapWithRetries("en")
+            );
+            long deadline = System.nanoTime() + NETWORK_OPERATION_BUDGET_MS * 1_000_000L;
+            BootstrapDto primary = primaryFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
+            BootstrapDto english = englishFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
+            return new BootstrapBundle(primary, english, Arrays.asList(normalized, "en"));
+        } finally {
+            parallel.shutdownNow();
+        }
+    }
+
+    private long remainingMillis(long deadlineNanos) throws IOException {
+        long remaining = (deadlineNanos - System.nanoTime()) / 1_000_000L;
+        if (remaining <= 0) {
+            throw new IOException("Server check timed out");
+        }
+        return remaining;
+    }
+
+    private String normalizeLanguage(String language) {
+        if ("ru".equalsIgnoreCase(language)) {
+            return "ru";
+        }
+        if ("uk".equalsIgnoreCase(language)) {
+            return "uk";
+        }
+        return "en";
+    }
+
+    private static final class BootstrapBundle {
+        final BootstrapDto primary;
+        final BootstrapDto english;
+        final List<String> languages;
+
+        BootstrapBundle(BootstrapDto primary, BootstrapDto english, List<String> languages) {
+            this.primary = primary;
+            this.english = english;
+            this.languages = languages;
+        }
     }
 
     private BootstrapDto fetchBootstrapWithRetries(String language) throws Exception {
@@ -798,12 +930,14 @@ public class QuizRepository {
         if (quizDatabase == null) {
             return;
         }
-        String normalized = language == null || language.trim().isEmpty()
-                ? "en" : language.trim().toLowerCase(java.util.Locale.US);
+        String normalized = normalizeLanguage(language);
+        List<String> allowed = "en".equals(normalized)
+                ? Arrays.asList("en")
+                : Arrays.asList(normalized, "en");
         quizDatabase.runInTransaction(() -> {
-            quizDao.deleteTopicTextsExcept(normalized);
-            quizDao.deleteQuestionTextsExcept(normalized);
-            quizDao.deleteOptionTextsExcept(normalized);
+            quizDao.deleteTopicTextsExceptLanguages(allowed);
+            quizDao.deleteQuestionTextsExceptLanguages(allowed);
+            quizDao.deleteOptionTextsExceptLanguages(allowed);
         });
     }
 
@@ -1077,6 +1211,17 @@ public class QuizRepository {
     private void clearStoredAuth() {
         if (appContext != null) {
             prefs().edit().remove(PREF_AUTH_TOKEN).remove(PREF_USER_ID).apply();
+        }
+    }
+
+    private void prepareLanguageCache(List<String> languages) {
+        quizDao.deleteTopicTextsExceptLanguages(languages);
+        quizDao.deleteQuestionTextsExceptLanguages(languages);
+        quizDao.deleteOptionTextsExceptLanguages(languages);
+        for (String language : languages) {
+            quizDao.clearTopicTextsForLanguage(language);
+            quizDao.clearQuestionTextsForLanguage(language);
+            quizDao.clearOptionTextsForLanguage(language);
         }
     }
 

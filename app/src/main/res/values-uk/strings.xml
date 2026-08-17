@@ -198,6 +198,8 @@ GitHub: github.com/example/quiz</string>
     <string name="settings_language_russian">Русский</string>
     <string name="settings_language_ukrainian">Українська</string>
     <string name="settings_language_applying">Застосовуємо мову…</string>
+    <string name="settings_language_requires_connection">Цю мову ще не завантажено. Спочатку підключіться до сервера.</string>
+    <string name="settings_language_download_failed">Не вдалося завантажити мову із сервера.</string>
     <string name="topic_ai_title">ШТУЧНИЙ ІНТЕЛЕКТ</string>
     <string name="topic_ai_description">Моделі, навчання й автоматизація</string>
     <string name="topic_all_title">УСІ ТЕМИ</string>

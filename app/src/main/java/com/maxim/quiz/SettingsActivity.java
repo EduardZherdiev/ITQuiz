@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.maxim.quiz.data.local.QuizDatabase;
 import com.maxim.quiz.data.QuizRepository;
@@ -104,6 +105,12 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    public void hideLanguageLoading() {
+        if (languageLoadingOverlay != null) {
+            languageLoadingOverlay.setVisibility(View.GONE);
+        }
+    }
+
     /** Captures the already rendered screen without blocking the UI thread. */
     public void captureConfigurationTransitionFrame(Runnable afterCapture) {
         ActivityTransitionBuffer.captureAsync(this, afterCapture);
@@ -126,6 +133,7 @@ public class SettingsActivity extends AppCompatActivity {
         private ActivityResultLauncher<String[]> galleryPicker;
         private ActivityResultLauncher<Void> cameraPreviewLauncher;
         private final Handler configurationChangeHandler = new Handler(Looper.getMainLooper());
+        private final AtomicBoolean languageChangeInProgress = new AtomicBoolean(false);
         private Runnable pendingConfigurationChange;
 
         @Override
@@ -205,8 +213,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             if (KEY_LANGUAGE.equals(preference.getKey())) {
-                applyLanguage(value);
-                return true;
+                return requestLanguageChange(value);
             }
 
             return false;
@@ -297,11 +304,7 @@ public class SettingsActivity extends AppCompatActivity {
             configurationChangeHandler.postDelayed(pendingConfigurationChange, 180L);
         }
 
-        private void applyLanguage(String value) {
-            applyLanguage(value, true);
-        }
-
-        private void applyLanguage(String value, boolean syncBootstrap) {
+        private void applyLanguage(String value, boolean ignoredSyncBootstrap) {
             if (value == null || value.isEmpty() || "system".equals(value)) {
                 return;
             }
@@ -317,37 +320,110 @@ public class SettingsActivity extends AppCompatActivity {
                 return;
             }
             if (!value.equals(currentLocale)) {
-                if (syncBootstrap) {
-                    if (getActivity() instanceof SettingsActivity) {
-                        SettingsActivity activity = (SettingsActivity) getActivity();
-                        activity.captureConfigurationTransitionFrame(() -> {
-                            if (isAdded()) {
-                                activity.showLanguageLoading();
-                                scheduleLanguageChange(value);
-                            }
-                        });
-                    } else {
-                        scheduleLanguageChange(value);
-                    }
-                } else {
-                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(value));
-                }
+                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(value));
             }
         }
 
-        private void scheduleLanguageChange(String value) {
-            // Let the ListPreference dialog finish its dismiss animation
-            // before AppCompat recreates the Activity. PixelCopy runs before
-            // this delay without blocking the main thread.
-            scheduleConfigurationChange(() -> {
+        private boolean requestLanguageChange(String value) {
+            if (value == null || value.isEmpty() || "system".equals(value)) {
+                return false;
+            }
+
+            Context context = requireContext();
+            QuizRepository repository = QuizRepository.create(context);
+            if (value.equals(QuizLanguage.current(context))) {
+                PreferenceManager.getDefaultSharedPreferences(context)
+                        .edit().putString(KEY_LANGUAGE, value).apply();
+                return false;
+            }
+
+            // English and the system language are downloaded during the first
+            // bootstrap. Switching between cached languages is therefore safe
+            // without a connection.
+            if ("en".equals(value) || repository.isLanguageCached(value)) {
+                commitLanguageAfterValidation(value, false);
+                return false;
+            }
+
+            // A new language must be fetched from the server before the
+            // preference or AppCompat locale is changed.
+            if (!NetworkState.isAvailable(context)) {
+                Toast.makeText(context, R.string.settings_language_requires_connection,
+                        Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            if (!languageChangeInProgress.compareAndSet(false, true)) {
+                return false;
+            }
+
+            if (getActivity() instanceof SettingsActivity) {
+                ((SettingsActivity) getActivity()).showLanguageLoading();
+            }
+            Context appContext = context.getApplicationContext();
+            new Thread(() -> {
+                Throwable failure = null;
+                try {
+                    // Includes a real authenticated server request and is
+                    // bounded by the repository's five-second network budget.
+                    QuizRepository.create(appContext).syncBootstrapBlocking(value);
+                } catch (Throwable error) {
+                    failure = error;
+                    Log.e(TAG, "Language download failed: " + value, error);
+                }
+                Throwable result = failure;
                 if (!isAdded()) {
                     return;
                 }
+                requireActivity().runOnUiThread(() -> {
+                    languageChangeInProgress.set(false);
+                    if (getActivity() instanceof SettingsActivity) {
+                        SettingsActivity activity = (SettingsActivity) getActivity();
+                        activity.hideLanguageLoading();
+                        if (result == null) {
+                            commitLanguageAfterValidation(value, true);
+                        } else {
+                            Toast.makeText(activity, R.string.settings_language_download_failed,
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+            }, "quiz-language-download").start();
+            return false;
+        }
+
+        private void commitLanguageAfterValidation(String value, boolean downloaded) {
+            if (!isAdded()) {
+                return;
+            }
+            Context context = requireContext();
+            PreferenceManager.getDefaultSharedPreferences(context)
+                    .edit().putString(KEY_LANGUAGE, value).apply();
+            ListPreference languagePreference = findPreference(KEY_LANGUAGE);
+            if (languagePreference != null) {
+                languagePreference.setValue(value);
+            }
+
+            String currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+            if (value.equals(currentLocale)) {
+                return;
+            }
+            if (getActivity() instanceof SettingsActivity) {
+                SettingsActivity activity = (SettingsActivity) getActivity();
+                activity.captureConfigurationTransitionFrame(() -> {
+                    if (isAdded()) {
+                        if (downloaded) {
+                            activity.showLanguageLoading();
+                        }
+                        scheduleConfigurationChange(() ->
+                                AppCompatDelegate.setApplicationLocales(
+                                        LocaleListCompat.forLanguageTags(value)
+                                )
+                        );
+                    }
+                });
+            } else {
                 AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(value));
-                Context appContext = requireContext().getApplicationContext();
-                new Thread(() -> QuizRepository.create(appContext).syncBootstrapAsync(value),
-                        "quiz-bootstrap-refresh").start();
-            });
+            }
         }
 
         @Override
