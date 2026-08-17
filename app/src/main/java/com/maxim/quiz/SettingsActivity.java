@@ -330,64 +330,99 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             Context context = requireContext();
-            QuizRepository repository = QuizRepository.create(context);
+            Log.d(TAG, "requestLanguageChange: requested=" + value
+                    + ", current=" + QuizLanguage.current(context)
+                    + ", network=" + NetworkState.isAvailable(context));
             if (value.equals(QuizLanguage.current(context))) {
                 PreferenceManager.getDefaultSharedPreferences(context)
                         .edit().putString(KEY_LANGUAGE, value).apply();
                 return false;
             }
 
-            // English and the system language are downloaded during the first
-            // bootstrap. Switching between cached languages is therefore safe
-            // without a connection.
-            if ("en".equals(value) || repository.isLanguageCached(value)) {
+            // English is always bundled and is also downloaded during the
+            // first bootstrap, so it must remain selectable offline.
+            if ("en".equals(value)) {
                 commitLanguageAfterValidation(value, false);
                 return false;
             }
 
-            // A new language must be fetched from the server before the
-            // preference or AppCompat locale is changed.
-            if (!NetworkState.isAvailable(context)) {
-                Toast.makeText(context, R.string.settings_language_requires_connection,
-                        Toast.LENGTH_SHORT).show();
-                return false;
-            }
             if (!languageChangeInProgress.compareAndSet(false, true)) {
                 return false;
             }
 
-            if (getActivity() instanceof SettingsActivity) {
-                ((SettingsActivity) getActivity()).showLanguageLoading();
+            SettingsActivity hostActivity = getActivity() instanceof SettingsActivity
+                    ? (SettingsActivity) getActivity() : null;
+            if (hostActivity != null) {
+                hostActivity.showLanguageLoading();
             }
             Context appContext = context.getApplicationContext();
+            QuizRepository repository = QuizRepository.create(appContext);
             new Thread(() -> {
                 Throwable failure = null;
+                boolean cached = false;
                 try {
-                    // Includes a real authenticated server request and is
-                    // bounded by the repository's five-second network budget.
-                    QuizRepository.create(appContext).syncBootstrapBlocking(value);
+                    // Room queries must never run from the preference callback
+                    // on the main thread.
+                    cached = repository.isLanguageCached(value);
+                    Log.d(TAG, "requestLanguageChange: cached=" + cached + " language=" + value);
+                    if (!cached) {
+                        if (!NetworkState.isAvailable(appContext)) {
+                            throw new java.io.IOException("Network is unavailable");
+                        }
+                        // A new language is accepted only after an authenticated
+                        // server request successfully downloads it.
+                        repository.syncBootstrapBlocking(value);
+                    }
                 } catch (Throwable error) {
                     failure = error;
                     Log.e(TAG, "Language download failed: " + value, error);
                 }
                 Throwable result = failure;
-                if (!isAdded()) {
+                boolean wasCached = cached;
+                if (hostActivity == null) {
+                    languageChangeInProgress.set(false);
                     return;
                 }
-                requireActivity().runOnUiThread(() -> {
+                hostActivity.runOnUiThread(() -> {
                     languageChangeInProgress.set(false);
-                    if (getActivity() instanceof SettingsActivity) {
-                        SettingsActivity activity = (SettingsActivity) getActivity();
-                        activity.hideLanguageLoading();
-                        if (result == null) {
-                            commitLanguageAfterValidation(value, true);
-                        } else {
-                            Toast.makeText(activity, R.string.settings_language_download_failed,
-                                    Toast.LENGTH_SHORT).show();
-                        }
+                    hostActivity.hideLanguageLoading();
+                    if (result == null) {
+                        commitLanguageAfterValidation(value, !wasCached);
+                    } else {
+                        boolean connectionError = !NetworkState.isAvailable(hostActivity)
+                                || isConnectivityFailure(result);
+                        Toast.makeText(hostActivity,
+                                connectionError
+                                        ? R.string.settings_language_requires_connection
+                                        : R.string.settings_language_download_failed,
+                                Toast.LENGTH_SHORT).show();
                     }
                 });
             }, "quiz-language-download").start();
+            return false;
+        }
+
+        private boolean isConnectivityFailure(Throwable error) {
+            Throwable current = error;
+            while (current != null) {
+                if (current instanceof java.net.ConnectException
+                        || current instanceof java.net.SocketTimeoutException
+                        || current instanceof java.net.UnknownHostException
+                        || current instanceof java.net.SocketException) {
+                    return true;
+                }
+                String message = current.getMessage();
+                if (message != null) {
+                    String normalized = message.toLowerCase(Locale.ROOT);
+                    if (normalized.contains("timeout")
+                            || normalized.contains("network is unavailable")
+                            || normalized.contains("failed to connect")
+                            || normalized.contains("unable to resolve host")) {
+                        return true;
+                    }
+                }
+                current = current.getCause();
+            }
             return false;
         }
 

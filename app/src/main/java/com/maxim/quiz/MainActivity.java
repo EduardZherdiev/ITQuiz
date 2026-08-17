@@ -14,6 +14,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        android.util.Log.i("MainActivity", "onCreate: networkAvailable="
+                + NetworkState.isAvailable() + ", displayedBalance="
+                + QuizApplication.getCurrencyBalance(this));
         setContentView(R.layout.activity_main);
         HeroImageLoader.load(findViewById(R.id.mainHeroImage));
         if (getSupportActionBar() != null) {

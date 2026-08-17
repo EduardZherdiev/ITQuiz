@@ -26,14 +26,16 @@ public class QuizApplication extends Application {
         NetworkState.initialize(this);
         applySavedLanguage();
         ensureInitialCurrencyBalance();
+        android.util.Log.i(TAG, "onCreate: language=" + QuizLanguage.current(this)
+                + ", networkAvailable=" + NetworkState.isAvailable()
+                + ", displayedBalance=" + getCurrencyBalance(this));
         NetworkState.addListener(available -> {
             if (available) {
                 scheduleNetworkSync(true);
             }
         });
-        // Prune stale translations even if the connection is already off.
-        // Older builds cached all three languages; only the current language
-        // must remain available for offline content.
+        // Remove only unsupported stale translations even if the connection is
+        // already off. Previously downloaded supported languages are kept.
         scheduleNetworkSync(PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean(PREF_STARTUP_COMPLETED, false));
         applySavedTheme();
@@ -44,7 +46,11 @@ public class QuizApplication extends Application {
         new Thread(() -> {
             QuizRepository repository = QuizRepository.create(appContext);
             repository.pruneCachedLanguages(QuizLanguage.current(appContext));
+            android.util.Log.i(TAG, "network-sync: started, refreshBootstrap=" + refreshBootstrap
+                    + ", networkAvailable=" + NetworkState.isAvailable()
+                    + ", localBalance=" + getCurrencyBalance(appContext));
             if (!NetworkState.isAvailable()) {
+                android.util.Log.i(TAG, "network-sync: skipped because network is unavailable");
                 return;
             }
             try {
@@ -56,8 +62,11 @@ public class QuizApplication extends Application {
                 if (refreshBootstrap) {
                     repository.syncBootstrapAsync(QuizLanguage.current(appContext));
                 }
+                android.util.Log.i(TAG, "network-sync: outboxes flushed, localBalance="
+                        + getCurrencyBalance(appContext));
             } catch (Exception error) {
-                android.util.Log.w(TAG, "Startup sync postponed", error);
+                android.util.Log.e(TAG, "network-sync: postponed, localBalance="
+                        + getCurrencyBalance(appContext), error);
             }
         }, "quiz-startup-sync").start();
     }

@@ -722,6 +722,9 @@ public class QuizRepository {
             throw new IOException("Network is unavailable");
         }
         List<OfflineQuizSessionEntity> pending = quizDao.getPendingOfflineQuizSessions();
+        android.util.Log.i("QuizRepository", "offline-sync: pending="
+                + (pending == null ? 0 : pending.size())
+                + ", localBalanceBefore=" + QuizApplication.getCurrencyBalance(appContext));
         if (pending == null || pending.isEmpty()) {
             return;
         }
@@ -750,11 +753,19 @@ public class QuizRepository {
                 response = withAuthenticatedRetries(token -> remoteDataSource.syncOfflineQuiz(token, sync));
             }
             if (response != null) {
+                android.util.Log.i("QuizRepository", "offline-sync: session=" + session.id
+                        + ", state=" + session.state
+                        + ", localBalanceBeforeResponse=" + QuizApplication.getCurrencyBalance(appContext)
+                        + ", serverBalance=" + response.balance
+                        + ", stake=" + response.stake
+                        + ", reward=" + response.rewardAmount);
                 QuizApplication.setDisplayedCurrencyBalance(appContext, response.balance);
                 quizDao.updateUserCurrencyBalance(getUserId(), response.balance);
             }
             quizDao.deleteOfflineQuizSession(session.id);
         }
+        android.util.Log.i("QuizRepository", "offline-sync: completed, localBalanceAfter="
+                + QuizApplication.getCurrencyBalance(appContext));
     }
 
     private void syncPendingAssetOperations() throws Exception {
@@ -762,6 +773,9 @@ public class QuizRepository {
             throw new IOException("Network is unavailable");
         }
         List<PendingAssetOperationEntity> pending = quizDao.getPendingAssetOperations();
+        android.util.Log.i("QuizRepository", "asset-sync: pending="
+                + (pending == null ? 0 : pending.size())
+                + ", localBalanceBefore=" + QuizApplication.getCurrencyBalance(appContext));
         if (pending == null || pending.isEmpty()) {
             return;
         }
@@ -784,6 +798,10 @@ public class QuizRepository {
                     ));
                 }
                 if (response != null && "PURCHASE".equals(operation.operationType)) {
+                    android.util.Log.i("QuizRepository", "asset-sync: operation=" + operation.operationId
+                            + ", asset=" + operation.assetId
+                            + ", localBalanceBeforeResponse=" + QuizApplication.getCurrencyBalance(appContext)
+                            + ", serverBalance=" + response.balance);
                     quizDao.updateUserCurrencyBalance(operation.userId, response.balance);
                     QuizApplication.setDisplayedCurrencyBalance(appContext, response.balance);
                 }
@@ -800,6 +818,8 @@ public class QuizRepository {
                 throw error;
             }
         }
+        android.util.Log.i("QuizRepository", "asset-sync: completed, localBalanceAfter="
+                + QuizApplication.getCurrencyBalance(appContext));
     }
 
     private void rollbackPendingAssetPurchase(PendingAssetOperationEntity operation) {
@@ -925,15 +945,15 @@ public class QuizRepository {
         return false;
     }
 
-    /** Removes stale translations downloaded by older app versions. */
+    /** Removes only unsupported/stale locales; downloaded supported languages are retained. */
     public void pruneCachedLanguages(String language) {
         if (quizDatabase == null) {
             return;
         }
-        String normalized = normalizeLanguage(language);
-        List<String> allowed = "en".equals(normalized)
-                ? Arrays.asList("en")
-                : Arrays.asList(normalized, "en");
+        // Do not reduce this list to the currently selected language. A user
+        // may have downloaded Russian, switched to Ukrainian, and then go
+        // offline; both cached translations must remain usable.
+        List<String> allowed = Arrays.asList("en", "ru", "uk");
         quizDatabase.runInTransaction(() -> {
             quizDao.deleteTopicTextsExceptLanguages(allowed);
             quizDao.deleteQuestionTextsExceptLanguages(allowed);
@@ -1215,9 +1235,9 @@ public class QuizRepository {
     }
 
     private void prepareLanguageCache(List<String> languages) {
-        quizDao.deleteTopicTextsExceptLanguages(languages);
-        quizDao.deleteQuestionTextsExceptLanguages(languages);
-        quizDao.deleteOptionTextsExceptLanguages(languages);
+        // The bootstrap response contains only the requested language and
+        // English. Replace those two snapshots, but preserve every other
+        // supported language already downloaded on this device.
         for (String language : languages) {
             quizDao.clearTopicTextsForLanguage(language);
             quizDao.clearQuestionTextsForLanguage(language);
@@ -1255,7 +1275,19 @@ public class QuizRepository {
 
         // user_assets has foreign keys to both users and assets, so both parent
         // records must exist before inserting the ownership rows.
-        quizDao.upsertUser(mapFirstUser(bootstrap.users));
+        UserEntity serverUser = mapFirstUser(bootstrap.users);
+        int localBalanceBefore = appContext == null
+                ? -1
+                : QuizApplication.getCurrencyBalance(appContext);
+        quizDao.upsertUser(serverUser);
+        if (appContext != null && bootstrap.users != null && !bootstrap.users.isEmpty()) {
+            // The server is authoritative after outboxes have been flushed.
+            // Keep the displayed preference in sync with Room as well, so the
+            // next screen cannot show an old local balance.
+            QuizApplication.setDisplayedCurrencyBalance(appContext, serverUser.currencyBalance);
+            android.util.Log.i("QuizRepository", "bootstrap: serverBalance="
+                    + serverUser.currencyBalance + ", localBalanceBefore=" + localBalanceBefore);
+        }
         quizDao.upsertAssets(mapAssets(bootstrap.assets));
         quizDao.upsertUserAssets(mapUserAssets(bootstrap.userAssets));
         quizDao.upsertCurrencyTransactions(mapTransactions(bootstrap.currencyTransactions));

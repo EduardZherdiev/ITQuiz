@@ -44,6 +44,7 @@ AD_REWARD_ITEM = "coins"
 AD_SSV_KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json"
 _admob_keys_cache: tuple[float, dict[int, object]] | None = None
 logger = logging.getLogger("quiz.monetization")
+balance_logger = logging.getLogger("quiz.balance")
 
 app.add_middleware(
     CORSMiddleware,
@@ -144,9 +145,14 @@ def top_up_currency(payload: TopUpCurrencyRequest, user_id: str = Depends(requir
         if existing is not None:
             if existing.amount != payload.amount or existing.reason != f"currency_top_up:{payload.source}":
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Top-up operation does not match the original request")
+            balance_logger.info(
+                "top-up replay user=%s source=%s operation=%s balance=%s",
+                user_id, payload.source, payload.operation_id, user.currency_balance,
+            )
             return QuizActionResponse(balance=user.currency_balance)
 
     now = int(time.time() * 1000)
+    balance_before = user.currency_balance
     user.currency_balance += payload.amount
     db.add(CurrencyTransaction(
         user_id=user_id,
@@ -156,6 +162,10 @@ def top_up_currency(payload: TopUpCurrencyRequest, user_id: str = Depends(requir
         created_at=now,
     ))
     db.commit()
+    balance_logger.info(
+        "top-up applied user=%s source=%s operation=%s before=%s after=%s",
+        user_id, payload.source, payload.operation_id, balance_before, user.currency_balance,
+    )
     return QuizActionResponse(balance=user.currency_balance)
 
 
@@ -369,7 +379,12 @@ def sync_offline_quiz(payload: OfflineQuizSyncRequest, user_id: str = Depends(re
                 or existing.stake != payload.stake):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Offline session does not match the original request")
         user = _locked_user(db, user_id)
+        balance_before = user.currency_balance
         if existing.finished_at is not None:
+            balance_logger.info(
+                "offline-sync replay user=%s client_session=%s balance=%s",
+                user_id, payload.client_session_id, user.currency_balance,
+            )
             return QuizActionResponse(session_id=existing.id, balance=user.currency_balance,
                                       stake=existing.stake, reward_amount=existing.reward_amount,
                                       finished_at=existing.finished_at)
@@ -387,6 +402,11 @@ def sync_offline_quiz(payload: OfflineQuizSyncRequest, user_id: str = Depends(re
             db.add(CurrencyTransaction(user_id=user_id, amount=reward,
                                        reason=f"offline_quiz_reward:{existing.id}", created_at=now))
         db.commit()
+        balance_logger.info(
+            "offline-sync finish existing user=%s client_session=%s before=%s after=%s stake=%s reward=%s cancelled=%s",
+            user_id, payload.client_session_id, balance_before, user.currency_balance,
+            existing.stake, reward, payload.cancelled,
+        )
         return QuizActionResponse(session_id=existing.id, balance=user.currency_balance,
                                   stake=existing.stake, reward_amount=reward,
                                   finished_at=now)
@@ -406,6 +426,7 @@ def sync_offline_quiz(payload: OfflineQuizSyncRequest, user_id: str = Depends(re
         multiplier = {"basic": 1.5, "common": 2.0, "advanced": 3.0}[payload.difficulty]
         reward = round(payload.stake * multiplier * percent / 100)
 
+    balance_before = user.currency_balance
     user.currency_balance -= payload.stake
     user.currency_balance += reward
     session = QuizSession(
@@ -429,6 +450,11 @@ def sync_offline_quiz(payload: OfflineQuizSyncRequest, user_id: str = Depends(re
         db.add(CurrencyTransaction(user_id=user_id, amount=reward,
                                    reason=f"offline_quiz_reward:{session.id}", created_at=now))
     db.commit()
+    balance_logger.info(
+        "offline-sync new user=%s client_session=%s before=%s after=%s stake=%s reward=%s cancelled=%s",
+        user_id, payload.client_session_id, balance_before, user.currency_balance,
+        payload.stake, reward, payload.cancelled,
+    )
     return QuizActionResponse(session_id=session.id, balance=user.currency_balance,
                               stake=payload.stake, reward_amount=reward, finished_at=now)
 
@@ -519,6 +545,7 @@ def purchase_asset(asset_id: int, payload: PurchaseAssetRequest, user_id: str = 
     if user.currency_balance < asset.price:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not enough coins")
 
+    balance_before = user.currency_balance
     user.currency_balance -= asset.price
     db.query(UserAsset).filter(UserAsset.user_id == user_id).filter(
         UserAsset.asset_id.in_(select(Asset.id).where(Asset.asset_type == asset.asset_type))
@@ -528,6 +555,10 @@ def purchase_asset(asset_id: int, payload: PurchaseAssetRequest, user_id: str = 
                                reason=f"asset_purchase:{asset_id}", created_at=int(time.time() * 1000),
                                client_operation_id=payload.operation_id))
     db.commit()
+    balance_logger.info(
+        "asset purchase user=%s asset=%s operation=%s before=%s after=%s price=%s",
+        user_id, asset_id, payload.operation_id, balance_before, user.currency_balance, asset.price,
+    )
     return QuizActionResponse(asset_id=asset_id, balance=user.currency_balance)
 
 
