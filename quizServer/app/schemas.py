@@ -171,6 +171,9 @@ class OfflineQuizSyncRequest(BaseModel):
 
 class PurchaseAssetRequest(BaseModel):
     asset_id: int
+    # Stable client id makes an offline retry safe: the server can recognize
+    # the same purchase after a timeout and never charge it twice.
+    operation_id: Optional[str] = Field(default=None, min_length=8, max_length=128)
 
 
 class TopUpCurrencyRequest(BaseModel):

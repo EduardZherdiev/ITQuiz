@@ -302,10 +302,6 @@ public class AssetsActivity extends AppCompatActivity {
 
     private void buyItem(AssetItem item) {
         Log.d(TAG, "buyItem: attempting purchase item=" + item.id + " price=" + item.price);
-        if (!NetworkState.isAvailable(this)) {
-            Toast.makeText(this, R.string.network_action_requires_connection, Toast.LENGTH_SHORT).show();
-            return;
-        }
         if (!assetActionInProgress.compareAndSet(false, true)) {
             return;
         }
@@ -313,21 +309,27 @@ public class AssetsActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 QuizRepository repository = QuizRepository.create(this);
-                com.maxim.quiz.data.remote.dto.QuizApiModels.ActionResponse response =
-                        repository.purchaseAsset(Integer.parseInt(item.id));
-                QuizApplication.setDisplayedCurrencyBalance(this, response.balance);
-                repository.applyAssetPurchaseLocally(Integer.parseInt(item.id), response.balance);
+                QuizRepository.AssetPurchaseResult result = repository.purchaseAssetWithOfflineSupport(
+                        Integer.parseInt(item.id)
+                );
+                QuizApplication.setDisplayedCurrencyBalance(this, result.balance);
+                if (!result.queuedForSync) {
+                    repository.applyAssetPurchaseLocally(Integer.parseInt(item.id), result.balance);
+                }
                 runOnUiThread(() -> {
                     updateCurrencyBar(toolbarCurrencyValue);
                     renderAssetsShopFromDb();
-                    Toast.makeText(AssetsActivity.this, R.string.assets_purchase_success, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(AssetsActivity.this,
+                            result.queuedForSync
+                                    ? R.string.assets_purchase_pending
+                                    : R.string.assets_purchase_success,
+                            Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "buyItem: error", e);
                 runOnUiThread(() -> Toast.makeText(this,
-                        !NetworkState.isAvailable(this)
-                                ? R.string.network_action_requires_connection
-                                : e.getMessage() != null && e.getMessage().contains("409")
+                        e.getMessage() != null && (e.getMessage().contains("409")
+                                || e.getMessage().contains("Not enough coins"))
                                 ? R.string.assets_not_enough_coins : R.string.assets_purchase_failed,
                         Toast.LENGTH_SHORT).show());
             } finally {
@@ -343,10 +345,6 @@ public class AssetsActivity extends AppCompatActivity {
 
     private void updateSelectedAssetInDb(String assetId, String assetCode, SlotType slot, View selectedRow) {
         Log.d(TAG, "updateSelectedAssetInDb: assetId=" + assetId + " slot=" + slot);
-        if (!NetworkState.isAvailable(this)) {
-            Toast.makeText(this, R.string.network_action_requires_connection, Toast.LENGTH_SHORT).show();
-            return;
-        }
         String previousAssetId = currentSelectedBySlot.get(slot);
         String previousAssetCode = preferences.getString(PREF_SELECTED_PREFIX + slot.name(), "");
 
@@ -363,10 +361,24 @@ public class AssetsActivity extends AppCompatActivity {
                 dao.clearSelectedForUserAndType(userId, slot.name());
                 dao.selectAsset(userId, assetId);
 
-                QuizRepository.create(this).selectAsset(Integer.parseInt(assetId));
+                boolean queued = QuizRepository.create(this).selectAssetWithOfflineSupport(
+                        Integer.parseInt(assetId),
+                        slot.name(),
+                        previousAssetId
+                );
                 Log.d(TAG, "updateSelectedAssetInDb: selected " + assetId + " on server");
             } catch (Exception e) {
                 Log.e(TAG, "updateSelectedAssetInDb: failed", e);
+                try {
+                    QuizDao dao = QuizDatabase.getInstance(this).quizDao();
+                    String userId = preferences.getString("pref_user_id", "user_test");
+                    dao.clearSelectedForUserAndType(userId, slot.name());
+                    if (previousAssetId != null && !previousAssetId.isEmpty()) {
+                        dao.selectAsset(userId, previousAssetId);
+                    }
+                } catch (Exception rollbackError) {
+                    Log.e(TAG, "updateSelectedAssetInDb: local rollback failed", rollbackError);
+                }
                 runOnUiThread(() -> {
                     if (previousAssetId == null || previousAssetId.isEmpty()) {
                         currentSelectedBySlot.remove(slot);

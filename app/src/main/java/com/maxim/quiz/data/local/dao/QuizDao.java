@@ -19,6 +19,7 @@ import com.maxim.quiz.data.local.entity.TopicTextEntity;
 import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
+import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
 import com.maxim.quiz.data.local.model.TopicCardRow;
 
 import java.util.List;
@@ -68,6 +69,18 @@ public interface QuizDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsertOfflineQuizSession(OfflineQuizSessionEntity session);
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertPendingAssetOperation(PendingAssetOperationEntity operation);
+
+    @Query("SELECT * FROM pending_asset_operations ORDER BY created_at")
+    List<PendingAssetOperationEntity> getPendingAssetOperations();
+
+    @Query("SELECT COUNT(*) FROM pending_asset_operations")
+    int countPendingAssetOperations();
+
+    @Query("DELETE FROM pending_asset_operations WHERE operation_id = :operationId")
+    void deletePendingAssetOperation(String operationId);
+
     @Query("SELECT * FROM offline_quiz_sessions WHERE id = :sessionId LIMIT 1")
     OfflineQuizSessionEntity getOfflineQuizSession(String sessionId);
 
@@ -82,6 +95,12 @@ public interface QuizDao {
 
     @Query("UPDATE users SET currency_balance = :balance WHERE id = :userId")
     void updateUserCurrencyBalance(String userId, int balance);
+
+    @Query("DELETE FROM user_assets WHERE user_id = :userId AND asset_id = :assetId")
+    void deleteUserAsset(String userId, String assetId);
+
+    @Query("SELECT ua.asset_id FROM user_assets ua INNER JOIN assets a ON a.id = ua.asset_id WHERE ua.user_id = :userId AND a.asset_type = :assetType AND ua.selected = 1 LIMIT 1")
+    String getSelectedAssetIdForType(String userId, String assetType);
 
     @Query("UPDATE users SET display_name = :displayName WHERE id = :userId")
     void updateUserDisplayName(String userId, String displayName);
@@ -169,6 +188,15 @@ public interface QuizDao {
 
     @Query("DELETE FROM topic_texts")
     void clearTopicTexts();
+
+    @Query("DELETE FROM topic_texts WHERE language_code != :language")
+    void deleteTopicTextsExcept(String language);
+
+    @Query("DELETE FROM question_texts WHERE language_code != :language")
+    void deleteQuestionTextsExcept(String language);
+
+    @Query("DELETE FROM option_texts WHERE language_code != :language")
+    void deleteOptionTextsExcept(String language);
 
     @Query("DELETE FROM topics")
     void clearTopics();

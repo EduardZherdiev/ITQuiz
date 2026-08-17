@@ -499,6 +499,20 @@ def purchase_asset(asset_id: int, payload: PurchaseAssetRequest, user_id: str = 
     asset = db.scalar(select(Asset).where(Asset.id == asset_id, Asset.is_active.is_(True)))
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+
+    if payload.operation_id:
+        previous_transaction = db.scalar(
+            select(CurrencyTransaction).where(
+                CurrencyTransaction.user_id == user_id,
+                CurrencyTransaction.client_operation_id == payload.operation_id,
+            )
+        )
+        if previous_transaction is not None:
+            expected_reason = f"asset_purchase:{asset_id}"
+            if previous_transaction.reason != expected_reason:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Operation ID was already used")
+            return QuizActionResponse(asset_id=asset_id, balance=user.currency_balance)
+
     existing = db.scalar(select(UserAsset).where(UserAsset.user_id == user_id, UserAsset.asset_id == asset_id))
     if existing is not None:
         return QuizActionResponse(asset_id=asset_id, balance=user.currency_balance)
@@ -511,7 +525,8 @@ def purchase_asset(asset_id: int, payload: PurchaseAssetRequest, user_id: str = 
     ).update({UserAsset.selected: False}, synchronize_session=False)
     db.add(UserAsset(user_id=user_id, asset_id=asset_id, selected=True, purchased_at=int(time.time() * 1000)))
     db.add(CurrencyTransaction(user_id=user_id, amount=-asset.price,
-                               reason=f"asset_purchase:{asset_id}", created_at=int(time.time() * 1000)))
+                               reason=f"asset_purchase:{asset_id}", created_at=int(time.time() * 1000),
+                               client_operation_id=payload.operation_id))
     db.commit()
     return QuizActionResponse(asset_id=asset_id, balance=user.currency_balance)
 

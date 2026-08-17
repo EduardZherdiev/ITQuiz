@@ -31,13 +31,11 @@ public class QuizApplication extends Application {
                 scheduleNetworkSync(true);
             }
         });
-        if (NetworkState.isAvailable()) {
-            // After the first setup, quietly refresh the local catalog in the
-            // background. StartupActivity owns the first required bootstrap;
-            // this keeps later launches fast and prepares offline play.
-            scheduleNetworkSync(PreferenceManager.getDefaultSharedPreferences(this)
-                    .getBoolean(PREF_STARTUP_COMPLETED, false));
-        }
+        // Prune stale translations even if the connection is already off.
+        // Older builds cached all three languages; only the current language
+        // must remain available for offline content.
+        scheduleNetworkSync(PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean(PREF_STARTUP_COMPLETED, false));
         applySavedTheme();
     }
 
@@ -45,9 +43,21 @@ public class QuizApplication extends Application {
         Context appContext = getApplicationContext();
         new Thread(() -> {
             QuizRepository repository = QuizRepository.create(appContext);
-            repository.syncOfflineSessionsAsync();
-            if (refreshBootstrap) {
-                repository.syncBootstrapAsync(QuizLanguage.current(appContext));
+            repository.pruneCachedLanguages(QuizLanguage.current(appContext));
+            if (!NetworkState.isAvailable()) {
+                return;
+            }
+            try {
+                // Keep the catalog refresh after both outboxes. Otherwise a
+                // failed pending purchase could be hidden by a bootstrap that
+                // overwrites the optimistic local ownership and balance.
+                repository.syncOfflineSessionsBlocking();
+                repository.syncPendingAssetOperationsBlocking();
+                if (refreshBootstrap) {
+                    repository.syncBootstrapAsync(QuizLanguage.current(appContext));
+                }
+            } catch (Exception error) {
+                android.util.Log.w(TAG, "Startup sync postponed", error);
             }
         }, "quiz-startup-sync").start();
     }

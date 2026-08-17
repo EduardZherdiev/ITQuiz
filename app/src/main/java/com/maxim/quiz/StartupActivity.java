@@ -115,7 +115,9 @@ public class StartupActivity extends AppCompatActivity {
         nextButton.setEnabled(false);
         statusText.setText(R.string.startup_stage_connecting);
         loadingText.setText(getString(R.string.startup_stage_bootstrap, describeLanguage(language)));
-        Log.d(TAG, "startBootstrapFlow: language=" + language + ", network=" + NetworkState.isAvailable(this));
+        Log.d(TAG, "startBootstrapFlow: language=" + language
+                + ", network=" + NetworkState.isAvailable(this)
+                + ", apiBaseUrl=" + BuildConfig.QUIZ_API_BASE_URL);
         progressValue = 0;
         updateProgressUi();
         handler.removeCallbacks(progressTick);
@@ -142,6 +144,7 @@ public class StartupActivity extends AppCompatActivity {
 
             @Override
             public void onError(Throwable throwable) {
+                Log.e(TAG, "bootstrap failed: apiBaseUrl=" + BuildConfig.QUIZ_API_BASE_URL, throwable);
                 runOnUiThread(() -> showError(R.string.startup_server_unavailable));
             }
         };

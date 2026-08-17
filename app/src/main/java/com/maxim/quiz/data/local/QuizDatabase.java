@@ -20,6 +20,7 @@ import com.maxim.quiz.data.local.entity.TopicTextEntity;
 import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
+import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
 
 @Database(
         entities = {
@@ -34,9 +35,10 @@ import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
                 AssetEntity.class,
                 UserAssetEntity.class,
                 CurrencyTransactionEntity.class,
-                OfflineQuizSessionEntity.class
+                OfflineQuizSessionEntity.class,
+                PendingAssetOperationEntity.class
         },
-            version = 6,
+            version = 7,
         exportSchema = false
 )
 public abstract class QuizDatabase extends RoomDatabase {
@@ -61,6 +63,26 @@ public abstract class QuizDatabase extends RoomDatabase {
         }
     };
 
+    public static final Migration MIGRATION_6_7 = new Migration(6, 7) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS pending_asset_operations (" +
+                    "operation_id TEXT NOT NULL PRIMARY KEY, " +
+                    "user_id TEXT NOT NULL, " +
+                    "operation_type TEXT NOT NULL, " +
+                    "asset_id TEXT NOT NULL, " +
+                    "asset_type TEXT NOT NULL, " +
+                    "price INTEGER NOT NULL, " +
+                    "previous_selected_asset_id TEXT, " +
+                    "balance_before INTEGER NOT NULL, " +
+                    "created_at INTEGER NOT NULL)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_pending_asset_operations_user_id " +
+                    "ON pending_asset_operations (user_id)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_pending_asset_operations_created_at " +
+                    "ON pending_asset_operations (created_at)");
+        }
+    };
+
     private static volatile QuizDatabase INSTANCE;
 
     public abstract QuizDao quizDao();
@@ -75,7 +97,7 @@ public abstract class QuizDatabase extends RoomDatabase {
                                     "quiz.db"
                             )
                                     .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-                            .addMigrations(MIGRATION_5_6)
+                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
                             .fallbackToDestructiveMigration()
                             .build();
                 }

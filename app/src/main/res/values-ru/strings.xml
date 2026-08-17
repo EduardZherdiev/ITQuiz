@@ -46,6 +46,7 @@ GitHub: github.com/example/quiz</string>
     <string name="assets_buy">Купить</string>
     <string name="assets_not_enough_coins">Недостаточно монет</string>
     <string name="assets_purchase_success">Покупка выполнена</string>
+    <string name="assets_purchase_pending">Покупка сохранена локально. Она синхронизируется после восстановления соединения.</string>
     <string name="assets_purchase_failed">Не удалось выполнить покупку</string>
     <string name="assets_selection_failed">Не удалось выбрать этот ассет.</string>
     <string name="assets_locked_achievement">Требуется достижение</string>

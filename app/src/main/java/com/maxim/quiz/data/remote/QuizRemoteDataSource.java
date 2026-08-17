@@ -102,8 +102,16 @@ public class QuizRemoteDataSource {
     }
 
     public QuizApiModels.ActionResponse purchaseAsset(String accessToken, int assetId) throws IOException {
-        QuizApiModels.PurchaseAssetRequest request = new QuizApiModels.PurchaseAssetRequest();
-        request.assetId = assetId;
+        return purchaseAsset(accessToken, assetId, null);
+    }
+
+    public QuizApiModels.ActionResponse purchaseAsset(
+            String accessToken,
+            int assetId,
+            String operationId
+    ) throws IOException {
+        QuizApiModels.PurchaseAssetRequest request =
+                new QuizApiModels.PurchaseAssetRequest(assetId, operationId);
         return executeAction(apiService.purchaseAsset(bearer(accessToken), assetId, request), "Asset purchase failed");
     }
 

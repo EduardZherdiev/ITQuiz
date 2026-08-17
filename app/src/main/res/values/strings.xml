@@ -52,6 +52,7 @@ GitHub: github.com/example/quiz</string>
     <string name="assets_buy">Buy</string>
     <string name="assets_not_enough_coins">Not enough coins</string>
     <string name="assets_purchase_success">Purchase successful</string>
+    <string name="assets_purchase_pending">Purchase saved locally. It will sync when the connection returns.</string>
     <string name="assets_purchase_failed">Purchase failed</string>
     <string name="assets_selection_failed">Could not select this asset.</string>
     <string name="assets_locked_achievement">Achievement required</string>

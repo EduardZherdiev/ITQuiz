@@ -69,7 +69,7 @@ def offline_payload(topic: int, session_id: str, **overrides) -> dict:
     return payload
 
 
-def test_bootstrap_contains_all_localizable_content(client):
+def test_bootstrap_contains_only_requested_language(client):
     headers = auth_headers(client, "catalog")
     response = client.get(
         "/api/v1/bootstrap",
@@ -78,9 +78,9 @@ def test_bootstrap_contains_all_localizable_content(client):
     assert response.status_code == 200, response.text
     payload = response.json()
 
-    assert {item["language_code"] for item in payload["topic_texts"]} == {"en", "ru", "uk"}
-    assert {item["language_code"] for item in payload["question_texts"]} == {"en", "ru", "uk"}
-    assert {item["language_code"] for item in payload["option_texts"]} == {"en", "ru", "uk"}
+    assert {item["language_code"] for item in payload["topic_texts"]} == {"ru"}
+    assert {item["language_code"] for item in payload["question_texts"]} == {"ru"}
+    assert {item["language_code"] for item in payload["option_texts"]} == {"ru"}
 
 
 def test_offline_sync_is_idempotent_and_does_not_charge_twice(client):
@@ -177,6 +177,29 @@ def test_offline_result_and_two_topup_sources_are_independent(client):
         headers=headers,
     )
     assert conflict.status_code == 409
+
+
+def test_asset_purchase_operation_is_idempotent(client):
+    headers = auth_headers(client, "asset-idempotency")
+    before = balance(client, headers)
+    operation_id = f"asset-purchase-{uuid.uuid4().hex}"
+    payload = {"asset_id": 2, "operation_id": operation_id}
+
+    first = client.post("/api/v1/me/assets/2/purchase", json=payload, headers=headers)
+    retry = client.post("/api/v1/me/assets/2/purchase", json=payload, headers=headers)
+
+    assert first.status_code == 200, first.text
+    assert retry.status_code == 200, retry.text
+    assert first.json()["balance"] == before - 1800
+    assert retry.json()["balance"] == first.json()["balance"]
+
+    with SessionLocal() as db:
+        purchase_count = db.scalar(
+            select(func.count(CurrencyTransaction.id)).where(
+                CurrencyTransaction.client_operation_id == operation_id,
+            )
+        )
+    assert purchase_count == 1
 
 
 def test_online_cancel_and_offline_sync_both_keep_the_stake(client):

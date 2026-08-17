@@ -24,6 +24,7 @@ import com.maxim.quiz.data.local.entity.TopicTextEntity;
 import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
+import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
 import com.maxim.quiz.data.local.model.TopicCardRow;
 import com.maxim.quiz.data.remote.QuizRemoteDataSource;
 import com.maxim.quiz.data.remote.dto.BootstrapDto;
@@ -51,6 +52,7 @@ public class QuizRepository {
     private static final String PREF_DEVICE_ID = "pref_device_id";
     private static final Object SYNC_LOCK = new Object();
     private static final ReentrantLock OFFLINE_SYNC_LOCK = new ReentrantLock(true);
+    private static final ReentrantLock ASSET_SYNC_LOCK = new ReentrantLock(true);
     private static final AtomicBoolean TOP_UP_IN_PROGRESS = new AtomicBoolean(false);
     private static final Queue<SyncRequest> SYNC_QUEUE = new ArrayDeque<>();
     private static final List<SyncCallback> ACTIVE_SYNC_CALLBACKS = new ArrayList<>();
@@ -74,6 +76,16 @@ public class QuizRepository {
         void onStageChanged(BootstrapStage stage, String message);
 
         void awaitNext() throws InterruptedException;
+    }
+
+    public static final class AssetPurchaseResult {
+        public final int balance;
+        public final boolean queuedForSync;
+
+        public AssetPurchaseResult(int balance, boolean queuedForSync) {
+            this.balance = balance;
+            this.queuedForSync = queuedForSync;
+        }
     }
 
     private final QuizDatabase quizDatabase;
@@ -226,6 +238,43 @@ public class QuizRepository {
             syncOfflineSessions();
         } finally {
             OFFLINE_SYNC_LOCK.unlock();
+        }
+    }
+
+    /** Flushes locally completed asset actions when the connection returns. */
+    public void syncPendingAssetOperationsAsync() {
+        if (remoteDataSource == null || quizDatabase == null || appContext == null || !NetworkState.isAvailable()) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            if (!ASSET_SYNC_LOCK.tryLock()) {
+                return;
+            }
+            try {
+                syncPendingAssetOperations();
+            } catch (Exception error) {
+                android.util.Log.w("QuizRepository", "Asset operation sync will retry", error);
+            } finally {
+                ASSET_SYNC_LOCK.unlock();
+            }
+        });
+    }
+
+    public void syncPendingAssetOperationsBlocking() throws Exception {
+        if (remoteDataSource == null || quizDatabase == null || appContext == null) {
+            return;
+        }
+        ASSET_SYNC_LOCK.lock();
+        try {
+            if (!NetworkState.isAvailable()) {
+                if (quizDao.countPendingAssetOperations() > 0) {
+                    throw new IOException("Pending asset actions cannot be synchronized while offline");
+                }
+                return;
+            }
+            syncPendingAssetOperations();
+        } finally {
+            ASSET_SYNC_LOCK.unlock();
         }
     }
 
@@ -576,6 +625,74 @@ public class QuizRepository {
         }
     }
 
+    private void syncPendingAssetOperations() throws Exception {
+        if (!NetworkState.isAvailable()) {
+            throw new IOException("Network is unavailable");
+        }
+        List<PendingAssetOperationEntity> pending = quizDao.getPendingAssetOperations();
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (PendingAssetOperationEntity operation : pending) {
+            if (!NetworkState.isAvailable()) {
+                throw new IOException("Network is unavailable");
+            }
+            try {
+                QuizApiModels.ActionResponse response;
+                if ("PURCHASE".equals(operation.operationType)) {
+                    response = withAuthenticatedRetries(token -> remoteDataSource.purchaseAsset(
+                            token,
+                            Integer.parseInt(operation.assetId),
+                            operation.operationId
+                    ));
+                } else {
+                    response = withAuthenticatedRetries(token -> remoteDataSource.selectAsset(
+                            token,
+                            Integer.parseInt(operation.assetId)
+                    ));
+                }
+                if (response != null && "PURCHASE".equals(operation.operationType)) {
+                    quizDao.updateUserCurrencyBalance(operation.userId, response.balance);
+                    QuizApplication.setDisplayedCurrencyBalance(appContext, response.balance);
+                }
+                quizDao.deletePendingAssetOperation(operation.operationId);
+            } catch (Exception error) {
+                if ("PURCHASE".equals(operation.operationType) && isConflict(error)) {
+                    rollbackPendingAssetPurchase(operation);
+                    continue;
+                }
+                if ("SELECT".equals(operation.operationType) && isConflict(error)) {
+                    rollbackPendingAssetSelection(operation);
+                    continue;
+                }
+                throw error;
+            }
+        }
+    }
+
+    private void rollbackPendingAssetPurchase(PendingAssetOperationEntity operation) {
+        quizDatabase.runInTransaction(() -> {
+            quizDao.deleteUserAsset(operation.userId, operation.assetId);
+            quizDao.updateUserCurrencyBalance(operation.userId, operation.balanceBefore);
+            quizDao.clearSelectedForUserAndType(operation.userId, operation.assetType);
+            if (operation.previousSelectedAssetId != null && !operation.previousSelectedAssetId.isEmpty()) {
+                quizDao.selectAsset(operation.userId, operation.previousSelectedAssetId);
+            }
+            quizDao.deletePendingAssetOperation(operation.operationId);
+        });
+        QuizApplication.setDisplayedCurrencyBalance(appContext, operation.balanceBefore);
+    }
+
+    private void rollbackPendingAssetSelection(PendingAssetOperationEntity operation) {
+        quizDatabase.runInTransaction(() -> {
+            quizDao.clearSelectedForUserAndType(operation.userId, operation.assetType);
+            if (operation.previousSelectedAssetId != null && !operation.previousSelectedAssetId.isEmpty()) {
+                quizDao.selectAsset(operation.userId, operation.previousSelectedAssetId);
+            }
+            quizDao.deletePendingAssetOperation(operation.operationId);
+        });
+    }
+
     private QuizApiModels.ActionResponse withNetworkRetries(RemoteCall call) throws Exception {
         Exception lastError = null;
         long deadline = System.nanoTime() + NETWORK_OPERATION_BUDGET_MS * 1_000_000L;
@@ -637,6 +754,59 @@ public class QuizRepository {
         return false;
     }
 
+    private boolean isConflict(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && (message.contains("HTTP 409") || message.contains("409 Conflict"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isNetworkFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof java.net.ConnectException
+                    || current instanceof java.net.SocketTimeoutException
+                    || current instanceof java.net.UnknownHostException
+                    || current instanceof java.net.SocketException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(java.util.Locale.US);
+                if (normalized.contains("timeout")
+                        || normalized.contains("failed to connect")
+                        || normalized.contains("unable to resolve host")
+                        || normalized.contains("network is unavailable")
+                        || normalized.contains("connection reset")
+                        || normalized.contains("unexpected end of stream")
+                        || normalized.contains("broken pipe")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /** Removes stale translations downloaded by older app versions. */
+    public void pruneCachedLanguages(String language) {
+        if (quizDatabase == null) {
+            return;
+        }
+        String normalized = language == null || language.trim().isEmpty()
+                ? "en" : language.trim().toLowerCase(java.util.Locale.US);
+        quizDatabase.runInTransaction(() -> {
+            quizDao.deleteTopicTextsExcept(normalized);
+            quizDao.deleteQuestionTextsExcept(normalized);
+            quizDao.deleteOptionTextsExcept(normalized);
+        });
+    }
+
     public void applyServerBalanceLocally(int balance) {
         if (quizDatabase != null && appContext != null) {
             quizDao.updateUserCurrencyBalance(getUserId(), balance);
@@ -644,7 +814,97 @@ public class QuizRepository {
     }
 
     public QuizApiModels.ActionResponse purchaseAsset(int assetId) throws Exception {
-        return withAuthenticatedRetries(token -> remoteDataSource.purchaseAsset(token, assetId));
+        String operationId = "asset_purchase_" + UUID.randomUUID();
+        return withAuthenticatedRetries(token -> remoteDataSource.purchaseAsset(token, assetId, operationId));
+    }
+
+    /**
+     * Buys an asset immediately from the local cache when offline. The local
+     * balance and ownership are changed in one transaction; the same stable
+     * operation id is later retried against the server.
+     */
+    public AssetPurchaseResult purchaseAssetWithOfflineSupport(int assetId) throws Exception {
+        if (quizDatabase == null || appContext == null) {
+            throw new IllegalStateException("Local database is unavailable");
+        }
+
+        if (quizDao.countPendingAssetOperations() > 0 && NetworkState.isAvailable()) {
+            syncPendingAssetOperationsBlocking();
+        }
+
+        String userId = getUserId();
+        AssetEntity asset = quizDao.getAssetById(String.valueOf(assetId));
+        if (asset == null || !asset.isActive) {
+            throw new IllegalStateException("Asset is unavailable offline");
+        }
+        List<UserAssetEntity> ownedAssets = quizDao.getUserAssets(userId);
+        if (ownedAssets != null) {
+            for (UserAssetEntity owned : ownedAssets) {
+                if (String.valueOf(assetId).equals(owned.assetId)) {
+                    UserEntity localUser = quizDao.getUserById(userId);
+                    int currentBalance = localUser == null
+                            ? QuizApplication.getCurrencyBalance(appContext)
+                            : localUser.currencyBalance;
+                    return new AssetPurchaseResult(currentBalance, false);
+                }
+            }
+        }
+
+        String operationId = "asset_purchase_" + UUID.randomUUID();
+        if (NetworkState.isAvailable()) {
+            try {
+                QuizApiModels.ActionResponse response = withAuthenticatedRetries(
+                        token -> remoteDataSource.purchaseAsset(token, assetId, operationId)
+                );
+                return new AssetPurchaseResult(response.balance, false);
+            } catch (Exception error) {
+                if (!isNetworkFailure(error)) {
+                    throw error;
+                }
+                android.util.Log.w("QuizRepository", "Asset purchase moved to offline queue", error);
+            }
+        }
+        return queueOfflineAssetPurchase(asset, userId, operationId);
+    }
+
+    private AssetPurchaseResult queueOfflineAssetPurchase(
+            AssetEntity asset,
+            String userId,
+            String operationId
+    ) {
+        UserEntity localUser = quizDao.getUserById(userId);
+        if (localUser == null) {
+            throw new IllegalStateException("Offline profile is not ready yet");
+        }
+        if (localUser.currencyBalance < asset.price) {
+            throw new IllegalStateException("Not enough coins");
+        }
+
+        int balanceAfter = localUser.currencyBalance - asset.price;
+        PendingAssetOperationEntity pending = new PendingAssetOperationEntity();
+        pending.operationId = operationId;
+        pending.userId = userId;
+        pending.operationType = "PURCHASE";
+        pending.assetId = asset.id;
+        pending.assetType = asset.assetType;
+        pending.price = asset.price;
+        pending.previousSelectedAssetId = quizDao.getSelectedAssetIdForType(userId, asset.assetType);
+        pending.balanceBefore = localUser.currencyBalance;
+        pending.createdAt = System.currentTimeMillis();
+
+        quizDatabase.runInTransaction(() -> {
+            quizDao.updateUserCurrencyBalance(userId, balanceAfter);
+            quizDao.clearSelectedForUserAndType(userId, asset.assetType);
+            UserAssetEntity userAsset = new UserAssetEntity();
+            userAsset.userId = userId;
+            userAsset.assetId = asset.id;
+            userAsset.selected = true;
+            userAsset.purchasedAt = System.currentTimeMillis();
+            quizDao.upsertUserAsset(userAsset);
+            quizDao.upsertPendingAssetOperation(pending);
+        });
+        QuizApplication.setDisplayedCurrencyBalance(appContext, balanceAfter);
+        return new AssetPurchaseResult(balanceAfter, true);
     }
 
     public void applyAssetPurchaseLocally(int assetId, int balance) {
@@ -670,6 +930,41 @@ public class QuizRepository {
 
     public QuizApiModels.ActionResponse selectAsset(int assetId) throws Exception {
         return withAuthenticatedRetries(token -> remoteDataSource.selectAsset(token, assetId));
+    }
+
+    public boolean selectAssetWithOfflineSupport(
+            int assetId,
+            String assetType,
+            String previousSelectedAssetId
+    ) throws Exception {
+        if (quizDatabase == null || appContext == null) {
+            throw new IllegalStateException("Local database is unavailable");
+        }
+        String operationId = "asset_select_" + UUID.randomUUID();
+        if (NetworkState.isAvailable()) {
+            try {
+                selectAsset(assetId);
+                return false;
+            } catch (Exception error) {
+                if (!isNetworkFailure(error)) {
+                    throw error;
+                }
+                android.util.Log.w("QuizRepository", "Asset selection moved to offline queue", error);
+            }
+        }
+
+        PendingAssetOperationEntity pending = new PendingAssetOperationEntity();
+        pending.operationId = operationId;
+        pending.userId = getUserId();
+        pending.operationType = "SELECT";
+        pending.assetId = String.valueOf(assetId);
+        pending.assetType = assetType == null ? "" : assetType;
+        pending.price = 0;
+        pending.previousSelectedAssetId = previousSelectedAssetId;
+        pending.balanceBefore = QuizApplication.getCurrencyBalance(appContext);
+        pending.createdAt = System.currentTimeMillis();
+        quizDao.upsertPendingAssetOperation(pending);
+        return true;
     }
 
     public QuizApiModels.ActionResponse topUpTestCurrency() throws Exception {
@@ -728,6 +1023,7 @@ public class QuizRepository {
     }
 
     private void prepareBalanceForTopUp() throws Exception {
+        syncPendingAssetOperationsBlocking();
         List<OfflineQuizSessionEntity> pending = quizDao.getPendingOfflineQuizSessions();
         if (pending != null && !pending.isEmpty()) {
             // The sync response already contains the canonical balance.

@@ -61,6 +61,16 @@ public final class QuizApiModels {
     public static class PurchaseAssetRequest {
         @SerializedName("asset_id")
         public int assetId;
+        @SerializedName("operation_id")
+        public String operationId;
+
+        public PurchaseAssetRequest() {
+        }
+
+        public PurchaseAssetRequest(int assetId, String operationId) {
+            this.assetId = assetId;
+            this.operationId = operationId;
+        }
     }
 
     public static class TopUpCurrencyRequest {
