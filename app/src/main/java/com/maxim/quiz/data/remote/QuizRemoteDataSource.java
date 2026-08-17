@@ -11,13 +11,22 @@ import retrofit2.Call;
 public class QuizRemoteDataSource {
 
     private final QuizApiService apiService;
+    private final QuizApiService bootstrapApiService;
 
     public QuizRemoteDataSource(QuizApiService apiService) {
+        this(apiService, apiService);
+    }
+
+    public QuizRemoteDataSource(QuizApiService apiService, QuizApiService bootstrapApiService) {
         this.apiService = apiService;
+        this.bootstrapApiService = bootstrapApiService;
     }
 
     public static QuizRemoteDataSource create() {
-        return new QuizRemoteDataSource(QuizApiClient.service());
+        return new QuizRemoteDataSource(
+                QuizApiClient.service(),
+                QuizApiClient.bootstrapService()
+        );
     }
 
     public BootstrapDto fetchBootstrap() throws IOException {
@@ -25,7 +34,7 @@ public class QuizRemoteDataSource {
     }
 
     public QuizApiModels.AuthResponse authenticate(String deviceId) throws IOException {
-        Response<QuizApiModels.AuthResponse> response = apiService
+        Response<QuizApiModels.AuthResponse> response = bootstrapApiService
                 .authenticate(new QuizApiModels.AuthRequest(deviceId)).execute();
         if (!response.isSuccessful() || response.body() == null) {
             throw new IOException("Anonymous auth failed: HTTP " + response.code());
@@ -38,7 +47,7 @@ public class QuizRemoteDataSource {
     }
 
     public BootstrapDto fetchBootstrap(String accessToken, String language) throws IOException {
-        Response<BootstrapDto> response = apiService.getBootstrap(bearer(accessToken), language).execute();
+        Response<BootstrapDto> response = bootstrapApiService.getBootstrap(bearer(accessToken), language).execute();
         if (!response.isSuccessful()) {
             throw new IOException("Bootstrap request failed: HTTP " + response.code());
         }

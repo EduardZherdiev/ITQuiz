@@ -6,6 +6,7 @@ import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 import androidx.room.Transaction;
+import androidx.room.Upsert;
 
 import com.maxim.quiz.data.local.entity.OptionEntity;
 import com.maxim.quiz.data.local.entity.OptionTextEntity;
@@ -27,19 +28,19 @@ import java.util.List;
 @Dao
 public interface QuizDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     void upsertTopics(List<TopicEntity> topics);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsertTopicTexts(List<TopicTextEntity> topicTexts);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     void upsertQuestions(List<QuestionEntity> questions);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsertQuestionTexts(List<QuestionTextEntity> questionTexts);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     void upsertOptions(List<OptionEntity> options);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

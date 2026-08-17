@@ -48,12 +48,14 @@ import java.io.IOException;
 public class QuizRepository {
 
     private static final long NETWORK_OPERATION_BUDGET_MS = 5000L;
+    private static final long BOOTSTRAP_DOWNLOAD_BUDGET_MS = 20000L;
     private static final int MAX_NETWORK_ATTEMPTS = 2;
 
     private static final String PREF_AUTH_TOKEN = "pref_auth_token";
     private static final String PREF_USER_ID = "pref_user_id";
     private static final String PREF_DEVICE_ID = "pref_device_id";
     private static final Object SYNC_LOCK = new Object();
+    private static final ReentrantLock BOOTSTRAP_DATA_LOCK = new ReentrantLock(true);
     private static final ReentrantLock OFFLINE_SYNC_LOCK = new ReentrantLock(true);
     private static final ReentrantLock ASSET_SYNC_LOCK = new ReentrantLock(true);
     private static final AtomicBoolean TOP_UP_IN_PROGRESS = new AtomicBoolean(false);
@@ -146,21 +148,27 @@ public class QuizRepository {
         if (!NetworkState.isAvailable()) {
             throw new IOException("Network is unavailable");
         }
-        syncOfflineSessionsBlocking();
-        syncPendingAssetOperationsBlocking();
-        BootstrapBundle bundle = fetchBootstrapBundle(language);
-        quizDatabase.runInTransaction(() -> prepareLanguageCache(bundle.languages));
-        quizDatabase.runInTransaction(() -> {
-            saveBootstrapTopics(bundle.primary);
-            if (bundle.english != bundle.primary) {
-                saveBootstrapTopics(bundle.english);
-            }
-            saveBootstrapAssets(bundle.primary);
-            saveBootstrapQuestions(bundle.primary);
-            if (bundle.english != bundle.primary) {
-                saveBootstrapQuestions(bundle.english);
-            }
-        });
+        BOOTSTRAP_DATA_LOCK.lock();
+        try {
+            syncOfflineSessionsBlocking();
+            syncPendingAssetOperationsBlocking();
+            BootstrapBundle bundle = fetchBootstrapBundle(language);
+            quizDatabase.runInTransaction(() -> prepareLanguageCache(bundle.languages));
+            quizDatabase.runInTransaction(() -> {
+                saveBootstrapTopics(bundle.primary);
+                if (bundle.english != null && bundle.english != bundle.primary) {
+                    saveBootstrapTopics(bundle.english);
+                }
+                saveBootstrapAssets(bundle.primary);
+                saveBootstrapQuestions(bundle.primary);
+                if (bundle.english != null && bundle.english != bundle.primary) {
+                    saveBootstrapQuestions(bundle.english);
+                }
+            });
+            logLanguageCacheState(bundle.languages, "blocking-bootstrap");
+        } finally {
+            BOOTSTRAP_DATA_LOCK.unlock();
+        }
     }
 
     public boolean isLanguageCached(String language) {
@@ -335,6 +343,7 @@ public class QuizRepository {
     private void startBootstrapSync(SyncRequest request) {
         request.repository.ioExecutor.execute(() -> {
             Throwable failure = null;
+            BOOTSTRAP_DATA_LOCK.lock();
             try {
                 // A server refresh must settle local actions first. Otherwise
                 // an old bootstrap response could overwrite a just-created
@@ -352,7 +361,7 @@ public class QuizRepository {
                 );
                 request.repository.quizDatabase.runInTransaction(() -> {
                     request.repository.saveBootstrapTopics(syncedBundle.primary);
-                    if (syncedBundle.english != syncedBundle.primary) {
+                    if (syncedBundle.english != null && syncedBundle.english != syncedBundle.primary) {
                         request.repository.saveBootstrapTopics(syncedBundle.english);
                     }
                 });
@@ -369,16 +378,19 @@ public class QuizRepository {
                 }
                 request.repository.quizDatabase.runInTransaction(() -> {
                     request.repository.saveBootstrapQuestions(syncedBundle.primary);
-                    if (syncedBundle.english != syncedBundle.primary) {
+                    if (syncedBundle.english != null && syncedBundle.english != syncedBundle.primary) {
                         request.repository.saveBootstrapQuestions(syncedBundle.english);
                     }
                 });
+                request.repository.logLanguageCacheState(syncedBundle.languages, "async-bootstrap");
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.QUESTIONS_READY, "questions ready");
                     request.flowCallback.awaitNext();
                 }
             } catch (Throwable throwable) {
                 failure = throwable;
+            } finally {
+                BOOTSTRAP_DATA_LOCK.unlock();
             }
             completeBootstrapSync(failure);
         });
@@ -398,13 +410,22 @@ public class QuizRepository {
         authenticateIfNeeded();
         ExecutorService parallel = Executors.newFixedThreadPool(2);
         try {
+            // English is retained locally after the first bootstrap. Download
+            // only the missing language on later switches so a cold Render
+            // wake-up does not unnecessarily double the request time.
+            if (isLanguageCached("en")) {
+                BootstrapDto primary = fetchBootstrapWithRetries(
+                        normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS
+                );
+                return new BootstrapBundle(primary, null, Arrays.asList(normalized));
+            }
             Future<BootstrapDto> primaryFuture = parallel.submit(
-                    () -> fetchBootstrapWithRetries(normalized)
+                    () -> fetchBootstrapWithRetries(normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS)
             );
             Future<BootstrapDto> englishFuture = parallel.submit(
-                    () -> fetchBootstrapWithRetries("en")
+                    () -> fetchBootstrapWithRetries("en", BOOTSTRAP_DOWNLOAD_BUDGET_MS)
             );
-            long deadline = System.nanoTime() + NETWORK_OPERATION_BUDGET_MS * 1_000_000L;
+            long deadline = System.nanoTime() + BOOTSTRAP_DOWNLOAD_BUDGET_MS * 1_000_000L;
             BootstrapDto primary = primaryFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
             BootstrapDto english = englishFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
             return new BootstrapBundle(primary, english, Arrays.asList(normalized, "en"));
@@ -444,8 +465,12 @@ public class QuizRepository {
     }
 
     private BootstrapDto fetchBootstrapWithRetries(String language) throws Exception {
+        return fetchBootstrapWithRetries(language, NETWORK_OPERATION_BUDGET_MS);
+    }
+
+    private BootstrapDto fetchBootstrapWithRetries(String language, long budgetMs) throws Exception {
         Exception lastError = null;
-        long deadline = System.nanoTime() + NETWORK_OPERATION_BUDGET_MS * 1_000_000L;
+        long deadline = System.nanoTime() + budgetMs * 1_000_000L;
         for (int attempt = 0; attempt < MAX_NETWORK_ATTEMPTS; attempt++) {
             try {
                 String token = authenticateIfNeeded();
@@ -1242,6 +1267,19 @@ public class QuizRepository {
             quizDao.clearTopicTextsForLanguage(language);
             quizDao.clearQuestionTextsForLanguage(language);
             quizDao.clearOptionTextsForLanguage(language);
+        }
+    }
+
+    private void logLanguageCacheState(List<String> languages, String source) {
+        if (languages == null || languages.isEmpty()) {
+            return;
+        }
+        for (String language : languages) {
+            android.util.Log.i("QuizRepository", "language-cache: source=" + source
+                    + ", language=" + language
+                    + ", topics=" + quizDao.countTopicTextsForLanguage(language)
+                    + ", questions=" + quizDao.countQuestionTextsForLanguage(language)
+                    + ", options=" + quizDao.countOptionTextsForLanguage(language));
         }
     }
 

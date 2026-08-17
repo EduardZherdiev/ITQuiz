@@ -23,9 +23,23 @@ public final class QuizApiClient {
             .writeTimeout(3, TimeUnit.SECONDS)
             .callTimeout(4500, TimeUnit.MILLISECONDS)
             .build();
+    /** Catalog downloads may wake a sleeping Render instance; action calls stay fast. */
+    private static final OkHttpClient BOOTSTRAP_HTTP_CLIENT = new OkHttpClient.Builder()
+            .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.SECONDS)
+            .build();
     private static final QuizApiService SERVICE = new Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(HTTP_CLIENT)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(QuizApiService.class);
+    private static final QuizApiService BOOTSTRAP_SERVICE = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(BOOTSTRAP_HTTP_CLIENT)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(QuizApiService.class);
@@ -35,5 +49,9 @@ public final class QuizApiClient {
 
     public static QuizApiService service() {
         return SERVICE;
+    }
+
+    public static QuizApiService bootstrapService() {
+        return BOOTSTRAP_SERVICE;
     }
 }
