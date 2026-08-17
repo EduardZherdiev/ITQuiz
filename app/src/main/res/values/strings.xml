@@ -210,6 +210,8 @@ GitHub: github.com/example/quiz</string>
     <string name="settings_language_russian">Русский</string>
     <string name="settings_language_ukrainian">Українська</string>
     <string name="settings_language_applying">Applying language…</string>
+    <string name="settings_language_requires_connection">This language is not downloaded yet. Connect to the server first.</string>
+    <string name="settings_language_download_failed">Could not download this language from the server.</string>
     <string name="topic_ai_title">ARTIFICIAL INTELLIGENCE</string>
     <string name="topic_ai_description">Models, learning and automation</string>
     <string name="topic_all_title">ALL TOPICS</string>

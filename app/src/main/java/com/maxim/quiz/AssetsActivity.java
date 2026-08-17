@@ -123,7 +123,22 @@ public class AssetsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateCurrencyBar(toolbarCurrencyValue);
-        if (!QuizRepository.create(this).isBootstrapSyncInProgress(QuizLanguage.current(this))) {
+        QuizRepository repository = QuizRepository.create(this);
+        repository.syncPendingAssetOperationsAsync(new QuizRepository.SyncCallback() {
+            @Override
+            public void onSuccess() {
+                runOnUiThread(() -> {
+                    updateCurrencyBar(toolbarCurrencyValue);
+                    renderAssetsShopFromDb();
+                });
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                Log.d(TAG, "No asset outbox sync on resume", throwable);
+            }
+        });
+        if (!repository.isBootstrapSyncInProgress(QuizLanguage.current(this))) {
             renderAssetsShopFromDb();
         }
     }
