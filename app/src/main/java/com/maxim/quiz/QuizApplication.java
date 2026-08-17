@@ -45,6 +45,10 @@ public class QuizApplication extends Application {
         Context appContext = getApplicationContext();
         new Thread(() -> {
             QuizRepository repository = QuizRepository.create(appContext);
+            // A process may have been killed while an offline game was open.
+            // Its local stake is already reserved and must be synchronized as
+            // a cancellation instead of being silently restored by bootstrap.
+            repository.recoverAbandonedOfflineSessions();
             repository.pruneCachedLanguages(QuizLanguage.current(appContext));
             android.util.Log.i(TAG, "network-sync: started, refreshBootstrap=" + refreshBootstrap
                     + ", networkAvailable=" + NetworkState.isAvailable()

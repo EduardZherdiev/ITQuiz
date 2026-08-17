@@ -88,6 +88,9 @@ public interface QuizDao {
     @Query("SELECT * FROM offline_quiz_sessions WHERE state IN ('COMPLETED_PENDING', 'CANCEL_PENDING', 'REMOTE_FINISH_PENDING', 'REMOTE_CANCEL_PENDING') ORDER BY started_at")
     List<OfflineQuizSessionEntity> getPendingOfflineQuizSessions();
 
+    @Query("SELECT * FROM offline_quiz_sessions WHERE state = 'STARTED' ORDER BY started_at")
+    List<OfflineQuizSessionEntity> getStartedOfflineQuizSessions();
+
     @Query("UPDATE offline_quiz_sessions SET remote_session_id = :remoteSessionId WHERE id = :sessionId")
     void setOfflineRemoteSessionId(String sessionId, String remoteSessionId);
 

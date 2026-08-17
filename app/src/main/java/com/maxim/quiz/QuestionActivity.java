@@ -633,6 +633,17 @@ public class QuestionActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Back is handled by exitQuestionScreen(). This covers Home, task
+        // switching, and other ways of leaving an unfinished offline game.
+        if (!isFinishing() && !isChangingConfigurations()
+                && sessionId != null && sessionId.startsWith("offline_")) {
+            QuizRepository.create(getApplicationContext()).markOfflineSessionAbandonedAsync(sessionId);
+        }
+    }
+
         private static class QuestionItem {
         final String question;
         final String[] options;

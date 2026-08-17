@@ -618,6 +618,53 @@ public class QuizRepository {
         return sessionId;
     }
 
+    /**
+     * Converts abandoned local games into cancellable outbox records. The
+     * stake was already reserved locally, so the server must receive the
+     * cancellation and charge that stake exactly once during synchronization.
+     */
+    public void recoverAbandonedOfflineSessions() {
+        if (quizDatabase == null) {
+            return;
+        }
+        List<OfflineQuizSessionEntity> started = quizDao.getStartedOfflineQuizSessions();
+        if (started == null || started.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        quizDatabase.runInTransaction(() -> {
+            for (OfflineQuizSessionEntity session : started) {
+                session.state = "CANCEL_PENDING";
+                session.correctAnswers = 0;
+                session.rewardAmount = 0;
+                session.finishedAt = now;
+                quizDao.upsertOfflineQuizSession(session);
+            }
+        });
+        android.util.Log.i("QuizRepository", "offline-recovery: marked abandoned sessions=" + started.size());
+    }
+
+    /** Marks a game as abandoned when the question screen is backgrounded. */
+    public void markOfflineSessionAbandonedAsync(String sessionId) {
+        if (sessionId == null || !isOfflineSessionId(sessionId) || quizDatabase == null) {
+            return;
+        }
+        ioExecutor.execute(() -> markOfflineSessionAbandoned(sessionId));
+    }
+
+    private void markOfflineSessionAbandoned(String sessionId) {
+        OfflineQuizSessionEntity session = quizDao.getOfflineQuizSession(sessionId);
+        if (session == null || !"STARTED".equals(session.state)) {
+            return;
+        }
+        session.state = "CANCEL_PENDING";
+        session.correctAnswers = 0;
+        session.rewardAmount = 0;
+        session.finishedAt = System.currentTimeMillis();
+        quizDao.upsertOfflineQuizSession(session);
+        android.util.Log.i("QuizRepository", "offline-recovery: session marked abandoned=" + sessionId);
+    }
+
     public QuizApiModels.ActionResponse finishQuiz(String sessionId, QuizApiModels.FinishQuizRequest request) throws Exception {
         if (isOfflineSessionId(sessionId)) {
             return finishOfflineQuiz(sessionId, request);
