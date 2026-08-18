@@ -445,10 +445,13 @@ public class GameModeActivity extends AppCompatActivity {
 
         currencySlider.post(() -> {
             int sidePadding = resolveSliderSidePadding(currencySlider);
+            int safeLeftPadding = Math.max(0, sidePadding - 10);
+            int safeRightPadding = Math.max(0, sidePadding);
+            currencyLabels.setVisibility(View.VISIBLE);
             currencyLabels.setPaddingRelative(
-                    sidePadding-10,
+                    safeLeftPadding,
                     currencyLabels.getPaddingTop(),
-                    sidePadding,
+                    safeRightPadding,
                     currencyLabels.getPaddingBottom()
             );
         });

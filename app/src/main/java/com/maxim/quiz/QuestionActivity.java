@@ -584,6 +584,7 @@ public class QuestionActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         exitQuestionScreen();
+        super.onBackPressed();
     }
 
     private void exitQuestionScreen() {

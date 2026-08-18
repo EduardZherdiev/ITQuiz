@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:clipToPadding="false"
+    android:fillViewport="false"
+    android:paddingBottom="24dp"
+    android:scrollbars="vertical"
+    tools:context=".ResultActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="48dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/result_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="36sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_marginTop="10dp">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/resultProgress"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:indeterminate="false"
+                android:rotation="180"
+                app:indicatorColor="?attr/colorPrimary"
+                app:indicatorInset="0dp"
+                app:indicatorSize="150dp"
+                app:trackColor="?attr/colorSurfaceContainerHighest"
+                app:trackThickness="11dp" />
+
+            <TextView
+                android:id="@+id/resultPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                tools:text="75%" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/resultValue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="2/2" />
+
+        <TextView
+            android:id="@+id/resultDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="16sp"
+            tools:text="Good result" />
+
+        <LinearLayout
+            android:id="@+id/resultRewardText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/resultRewardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="Treasure unlocked!" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/rewardSelectedValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="1000" />
+                <ImageView
+                    android:id="@+id/rewardSelectedCoin"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="@string/game_mode_currency_title"
+                    android:src="@drawable/coin" />
+                <TextView
+                    android:id="@+id/rewardMultiplierText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="x2" />
+                <TextView
+                    android:id="@+id/rewardPercentText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="x 75%" />
+                <TextView
+                    android:id="@+id/rewardEqualsText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="=" />
+                <TextView
+                    android:id="@+id/rewardResultValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="1500" />
+                <ImageView
+                    android:id="@+id/rewardResultCoin"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="3dp"
+                    android:contentDescription="@string/game_mode_currency_title"
+                    android:src="@drawable/coin" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retryQuizButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/result_retry"
+            android:textSize="15sp"
+            app:cornerRadius="14dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewAnswersButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:text="@string/result_review_answers"
+            android:textSize="15sp"
+            app:cornerRadius="14dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/finishQuizButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:text="@string/result_finish"
+            android:textSize="15sp"
+            app:cornerRadius="14dp" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -176,6 +176,12 @@ GitHub: github.com/example/quiz</string>
     <string name="startup_stage_ready">Завантаження завершено. Натисніть Next, щоб продовжити.</string>
     <string name="startup_next">Next</string>
     <string name="game_mode_loading_match">Запуск гри…</string>
+    <string name="startup_status_connecting">Підключення до сервера…</string>
+    <string name="startup_status_ready">Готово</string>
+    <string name="startup_network_required">Під час першого запуску потрібен інтернет. Підключіться до сервера та повторіть спробу.</string>
+    <string name="startup_server_unavailable">Сервер зараз недоступний. Спробуйте пізніше.</string>
+    <string name="startup_retry">Повторити</string>
+    <string name="startup_progress_percent">%1$d%%</string>
     <string name="offline_mode_started">Офлайн-режим: ставку збережено локально.</string>
     <string name="offline_result_saved">Результат збережено локально. Його буде синхронізовано після відновлення з’єднання.</string>
     <string name="network_retrying">З’єднання втрачено. Повторна спроба…</string>

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    tools:context=".MainActivity">
+
+    <FrameLayout
+        android:id="@+id/mainTopLeftProfile"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginTop="18dp"
+        android:background="@drawable/bg_question_avatar_slot"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/mainTopLeftIcon"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_avatar_image_clip"
+            android:clipToOutline="true"
+            android:contentDescription="@string/app_name"
+            android:scaleType="centerCrop"
+            android:src="@drawable/user" />
+
+        <TextView
+            android:id="@+id/mainTopLeftNameOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#80000000"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:textColor="@android:color/white"
+            android:textSize="7sp"
+            tools:text="Max Tester" />
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/mainTopLeftCrown"
+        android:layout_width="50dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="-28dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/app_name"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="@id/mainTopLeftProfile"
+        app:layout_constraintStart_toStartOf="@id/mainTopLeftProfile"
+        app:layout_constraintTop_toTopOf="@id/mainTopLeftProfile" />
+
+    <include
+        android:id="@+id/mainCurrencyBar"
+        layout="@layout/currency_bar_full"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/mainLandscapeContent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="68dp"
+        android:layout_marginBottom="10dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.9"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <ImageView
+                android:id="@+id/mainHeroImage"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="8dp"
+                android:adjustViewBounds="true"
+                android:background="@android:color/transparent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/quiz_hero" />
+        </LinearLayout>
+
+        <GridLayout
+            android:id="@+id/mainActions"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.25"
+            android:alignmentMode="alignMargins"
+            android:columnCount="2"
+            android:columnOrderPreserved="false"
+            android:rowCount="3"
+            android:useDefaultMargins="false">
+
+            <Button
+                android:id="@+id/buttonPlay"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_play"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/buttonAssets"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_assets"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/buttonShare"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_share"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/buttonCreateQuiz"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_create_quiz"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/buttonAbout"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_about"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/buttonSettins"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                android:text="@string/button_settings"
+                android:textSize="15sp" />
+        </GridLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/mainHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/mainHeader"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@+id/mainTopLeftProfile"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/mainTopLeftProfile" />
+</androidx.constraintlayout.widget.ConstraintLayout>

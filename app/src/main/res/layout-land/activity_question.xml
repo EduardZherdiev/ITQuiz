@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    tools:context=".QuestionActivity">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/main"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/questionCounterText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="1/10" />
+
+        <FrameLayout
+            android:id="@+id/questionTimerContainer"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_marginTop="3dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/questionCounterText">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/questionTimerProgress"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:indeterminate="false"
+                app:indicatorColor="?attr/colorPrimary"
+                app:indicatorDirectionCircular="clockwise"
+                app:indicatorInset="0dp"
+                app:indicatorSize="76dp"
+                app:trackColor="?attr/colorSurfaceContainerHighest"
+                app:trackThickness="5dp" />
+
+            <TextView
+                android:id="@+id/questionTimerText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="25sp"
+                android:textStyle="bold"
+                tools:text="16" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/questionPlayerScoreBlock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center|center_horizontal"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="@id/questionTimerContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/questionTimerContainer">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:id="@+id/questionPlayerFrame"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_question_avatar_slot"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
+                    <ImageView
+                        android:id="@+id/questionPlayerIcon"
+                        android:layout_width="39dp"
+                        android:layout_height="39dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_avatar_image_clip"
+                        android:clipToOutline="true"
+                        android:contentDescription="@string/game_mode_solo"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/user" />
+
+                    <TextView
+                        android:id="@+id/questionPlayerNameOverlay"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom"
+                        android:background="#80000000"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:textColor="@android:color/white"
+                        android:textSize="6sp"
+                        tools:text="Max Tester" />
+
+                    <ImageView
+                        android:id="@+id/questionPlayerCrown"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="-25dp"
+                        android:adjustViewBounds="true"
+                        android:contentDescription="@string/game_mode_solo"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                </FrameLayout>
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/correctAnswersText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:textColor="#FF2E7D32"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/questionOpponentScoreBlock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center|center_horizontal"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="@id/questionTimerContainer"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/questionTimerContainer">
+
+            <TextView
+                android:id="@+id/correctAnswersOpponentText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="3dp"
+                android:textColor="#FF2E7D32"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:id="@+id/questionOpponentFrame"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_question_avatar_slot"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
+                    <ImageView
+                        android:id="@+id/questionOpponentIcon"
+                        android:layout_width="39dp"
+                        android:layout_height="39dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_avatar_image_clip"
+                        android:clipToOutline="true"
+                        android:contentDescription="@string/game_mode_two_players"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/user" />
+
+                    <ImageView
+                        android:id="@+id/questionOpponentCrown"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="-25dp"
+                        android:adjustViewBounds="true"
+                        android:contentDescription="@string/game_mode_two_players"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                </FrameLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/soloUserFrame"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_question_avatar_slot"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            app:layout_constraintBottom_toBottomOf="@+id/questionTimerContainer"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/questionTimerContainer">
+
+            <ImageView
+                android:id="@+id/soloUserIcon"
+                android:layout_width="39dp"
+                android:layout_height="39dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_avatar_image_clip"
+                android:clipToOutline="true"
+                android:contentDescription="@string/game_mode_solo"
+                android:scaleType="centerCrop"
+                android:src="@drawable/user" />
+
+            <TextView
+                android:id="@+id/soloUserNameOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#80000000"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp"
+                android:textColor="@android:color/white"
+                android:textSize="6sp"
+                tools:text="Max Tester" />
+
+            <ImageView
+                android:id="@+id/soloUserCrown"
+                android:layout_width="60dp"
+                android:layout_height="32dp"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_marginTop="-27dp"
+                android:contentDescription="@string/game_mode_solo"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/soloCorrectAnswersText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FF2E7D32"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@+id/questionTimerContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/questionTimerContainer"
+            tools:text="0" />
+
+        <TextView
+            android:id="@+id/questionText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="4dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/questionTimerContainer"
+            tools:text="Which concept is most closely associated with functions in JS?" />
+
+        <GridLayout
+            android:id="@+id/answersGrid"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="6dp"
+            android:columnCount="2"
+            android:rowCount="2"
+            android:useDefaultMargins="false"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/questionText">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/answerButton1"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_answer_default"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:maxLines="3"
+                android:text="Option 1"
+                android:textAllCaps="false"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/answerButton2"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_answer_default"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:maxLines="3"
+                android:text="Option 2"
+                android:textAllCaps="false"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/answerButton3"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_answer_default"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:maxLines="3"
+                android:text="Option 3"
+                android:textAllCaps="false"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/answerButton4"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_answer_default"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:maxLines="3"
+                android:text="Option 4"
+                android:textAllCaps="false"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
+        </GridLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout
+        android:id="@+id/questionLoadingPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80FFFFFF"
+        android:elevation="8dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/questionLoadingProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</FrameLayout>

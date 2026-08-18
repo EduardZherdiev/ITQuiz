@@ -63,6 +63,7 @@ public class QuizApplication extends Application {
                 // overwrites the optimistic local ownership and balance.
                 repository.syncOfflineSessionsBlocking();
                 repository.syncPendingAssetOperationsBlocking();
+                repository.syncPendingCurrencyOperationsBlocking();
                 if (refreshBootstrap) {
                     repository.syncBootstrapAsync(QuizLanguage.current(appContext));
                 }

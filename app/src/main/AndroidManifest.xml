@@ -22,6 +22,7 @@
         <activity
             android:name=".StartupActivity"
             android:theme="@style/Theme.Quiz.Startup"
+            android:screenOrientation="fullSensor"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -31,42 +32,52 @@
         </activity>
         <activity
             android:name=".ExplanationActivity"
+            android:screenOrientation="fullSensor"
             android:exported="false" />
         <activity
             android:name=".CurrencyTopUpActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".MainActivity" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:label="@string/title_activity_settings"
             android:theme="@style/Theme.Quiz.Settings" />
         <activity
             android:name=".ResultActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".QuestionActivity" />
         <activity
             android:name=".QuestionActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".GameModeActivity" />
         <activity
             android:name=".GameModeActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".TopicsActivity" />
         <activity
             android:name=".AboutActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".MainActivity" />
         <activity
             android:name=".AssetsActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".MainActivity" />
         <activity
             android:name=".TopicsActivity"
             android:exported="false"
+            android:screenOrientation="fullSensor"
             android:parentActivityName=".MainActivity" />
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="fullSensor"
             android:exported="true" />
     </application>
 

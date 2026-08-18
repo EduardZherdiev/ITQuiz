@@ -25,7 +25,7 @@ services:
       - key: QUIZ_RESET_DB_ON_STARTUP
         value: "0"
       - key: QUIZ_ENABLE_TEST_TOPUPS
-        value: "0"
+        value: "1"
       - key: QUIZ_ALLOWED_ORIGINS
         value: "*"
       - key: GOOGLE_PLAY_PACKAGE_NAME

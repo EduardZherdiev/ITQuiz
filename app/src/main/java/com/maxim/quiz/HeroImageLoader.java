@@ -21,6 +21,9 @@ public final class HeroImageLoader {
             return;
         }
         WeakReference<ImageView> targetReference = new WeakReference<>(target);
+        // The bitmap has transparent pixels. Do not leave an opaque
+        // placeholder surface behind it during asynchronous decoding.
+        target.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         target.setImageDrawable(null);
         EXECUTOR.execute(() -> {
             ImageView view = targetReference.get();

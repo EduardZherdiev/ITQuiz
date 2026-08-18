@@ -375,7 +375,7 @@ public class CurrencyTopUpActivity extends AppCompatActivity implements Purchase
     }
 
     private void topUp(boolean simulatedAd) {
-        if (!NetworkState.isAvailable(this)) {
+        if (simulatedAd && !NetworkState.isAvailable(this)) {
             Toast.makeText(this, R.string.network_action_requires_connection, Toast.LENGTH_SHORT).show();
             return;
         }

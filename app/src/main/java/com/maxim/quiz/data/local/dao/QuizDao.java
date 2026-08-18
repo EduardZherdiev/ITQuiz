@@ -21,6 +21,7 @@ import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
 import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
+import com.maxim.quiz.data.local.entity.PendingCurrencyOperationEntity;
 import com.maxim.quiz.data.local.model.TopicCardRow;
 
 import java.util.List;
@@ -81,6 +82,21 @@ public interface QuizDao {
 
     @Query("DELETE FROM pending_asset_operations WHERE operation_id = :operationId")
     void deletePendingAssetOperation(String operationId);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertPendingCurrencyOperation(PendingCurrencyOperationEntity operation);
+
+    @Query("SELECT * FROM pending_currency_operations ORDER BY created_at")
+    List<PendingCurrencyOperationEntity> getPendingCurrencyOperations();
+
+    @Query("SELECT COUNT(*) FROM pending_currency_operations")
+    int countPendingCurrencyOperations();
+
+    @Query("SELECT COUNT(*) FROM pending_currency_operations WHERE user_id = :userId")
+    int countPendingCurrencyOperationsForUser(String userId);
+
+    @Query("DELETE FROM pending_currency_operations WHERE operation_id = :operationId")
+    void deletePendingCurrencyOperation(String operationId);
 
     @Query("SELECT * FROM offline_quiz_sessions WHERE id = :sessionId LIMIT 1")
     OfflineQuizSessionEntity getOfflineQuizSession(String sessionId);

@@ -25,6 +25,7 @@ import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
 import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
+import com.maxim.quiz.data.local.entity.PendingCurrencyOperationEntity;
 import com.maxim.quiz.data.local.model.TopicCardRow;
 import com.maxim.quiz.data.remote.QuizRemoteDataSource;
 import com.maxim.quiz.data.remote.dto.BootstrapDto;
@@ -58,6 +59,7 @@ public class QuizRepository {
     private static final ReentrantLock BOOTSTRAP_DATA_LOCK = new ReentrantLock(true);
     private static final ReentrantLock OFFLINE_SYNC_LOCK = new ReentrantLock(true);
     private static final ReentrantLock ASSET_SYNC_LOCK = new ReentrantLock(true);
+    private static final ReentrantLock CURRENCY_SYNC_LOCK = new ReentrantLock(true);
     private static final AtomicBoolean TOP_UP_IN_PROGRESS = new AtomicBoolean(false);
     private static final Queue<SyncRequest> SYNC_QUEUE = new ArrayDeque<>();
     private static final List<SyncCallback> ACTIVE_SYNC_CALLBACKS = new ArrayList<>();
@@ -152,6 +154,7 @@ public class QuizRepository {
         try {
             syncOfflineSessionsBlocking();
             syncPendingAssetOperationsBlocking();
+            syncPendingCurrencyOperationsBlocking();
             BootstrapBundle bundle = fetchBootstrapBundle(language);
             quizDatabase.runInTransaction(() -> prepareLanguageCache(bundle.languages));
             quizDatabase.runInTransaction(() -> {
@@ -350,6 +353,7 @@ public class QuizRepository {
                 // offline purchase with the previous ownership and balance.
                 request.repository.syncOfflineSessionsBlocking();
                 request.repository.syncPendingAssetOperationsBlocking();
+                request.repository.syncPendingCurrencyOperationsBlocking();
                 if (request.flowCallback != null) {
                     request.flowCallback.onStageChanged(BootstrapStage.CONNECTING, "connecting");
                     request.flowCallback.awaitNext();
@@ -894,6 +898,65 @@ public class QuizRepository {
                 + QuizApplication.getCurrencyBalance(appContext));
     }
 
+    /** Flushes local test rewards after the connection returns. */
+    public void syncPendingCurrencyOperationsBlocking() throws Exception {
+        if (remoteDataSource == null || quizDatabase == null || appContext == null) {
+            return;
+        }
+        CURRENCY_SYNC_LOCK.lock();
+        try {
+            if (!NetworkState.isAvailable()) {
+                if (quizDao.countPendingCurrencyOperations() > 0) {
+                    throw new IOException("Pending currency actions cannot be synchronized while offline");
+                }
+                return;
+            }
+            syncPendingCurrencyOperations();
+        } finally {
+            CURRENCY_SYNC_LOCK.unlock();
+        }
+    }
+
+    private void syncPendingCurrencyOperations() throws Exception {
+        if (!NetworkState.isAvailable()) {
+            throw new IOException("Network is unavailable");
+        }
+        List<PendingCurrencyOperationEntity> pending = quizDao.getPendingCurrencyOperations();
+        android.util.Log.i("QuizRepository", "currency-sync: pending="
+                + (pending == null ? 0 : pending.size())
+                + ", localBalanceBefore=" + QuizApplication.getCurrencyBalance(appContext));
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (PendingCurrencyOperationEntity operation : pending) {
+            if (!NetworkState.isAvailable()) {
+                throw new IOException("Network is unavailable");
+            }
+            try {
+                QuizApiModels.ActionResponse response = withAuthenticatedRetries(
+                        token -> remoteDataSource.topUpTestCurrency(token, operation.operationId)
+                );
+                if (response != null) {
+                    quizDao.updateUserCurrencyBalance(operation.userId, response.balance);
+                    QuizApplication.setDisplayedCurrencyBalance(appContext, response.balance);
+                    android.util.Log.i("QuizRepository", "currency-sync: operation="
+                            + operation.operationId + ", serverBalance=" + response.balance);
+                }
+                quizDao.deletePendingCurrencyOperation(operation.operationId);
+            } catch (Exception error) {
+                if (isNetworkFailure(error)) {
+                    throw error;
+                }
+                // Keep the local reward and retry it later. A temporarily
+                // disabled test endpoint must not block bootstrap downloads.
+                android.util.Log.w("QuizRepository", "currency-sync: operation postponed="
+                        + operation.operationId, error);
+            }
+        }
+        android.util.Log.i("QuizRepository", "currency-sync: completed, localBalanceAfter="
+                + QuizApplication.getCurrencyBalance(appContext));
+    }
+
     private void rollbackPendingAssetPurchase(PendingAssetOperationEntity operation) {
         quizDatabase.runInTransaction(() -> {
             quizDao.deleteUserAsset(operation.userId, operation.assetId);
@@ -1198,18 +1261,64 @@ public class QuizRepository {
             throw new IllegalStateException("Currency top-up is already in progress");
         }
         try {
-            prepareBalanceForTopUp();
-            String operationId = "topup_" + UUID.randomUUID();
-            QuizApiModels.ActionResponse response = withAuthenticatedRetries(
-                    token -> remoteDataSource.topUpTestCurrency(token, operationId));
-            if (appContext != null) {
-                quizDao.updateUserCurrencyBalance(getUserId(), response.balance);
-                QuizApplication.setDisplayedCurrencyBalance(appContext, response.balance);
+            // Settle older local debits first when possible. If the connection
+            // is unavailable, the reward is still granted locally below.
+            if (NetworkState.isAvailable()) {
+                try {
+                    syncOfflineSessionsBlocking();
+                    syncPendingAssetOperationsBlocking();
+                } catch (Exception error) {
+                    android.util.Log.w("QuizRepository", "test-top-up: previous actions postponed", error);
+                }
             }
-            return response;
+            QuizApiModels.ActionResponse localResponse = queueLocalTestTopUp();
+            if (NetworkState.isAvailable()) {
+                try {
+                    syncPendingCurrencyOperationsBlocking();
+                    UserEntity current = quizDao.getUserById(getUserId());
+                    if (current != null) {
+                        localResponse.balance = current.currencyBalance;
+                    }
+                } catch (Exception error) {
+                    android.util.Log.w("QuizRepository", "test-top-up: queued for retry", error);
+                }
+            }
+            return localResponse;
         } finally {
             TOP_UP_IN_PROGRESS.set(false);
         }
+    }
+
+    private QuizApiModels.ActionResponse queueLocalTestTopUp() {
+        if (quizDatabase == null || appContext == null) {
+            throw new IllegalStateException("Local database is unavailable");
+        }
+        String userId = getUserId();
+        UserEntity localUser = quizDao.getUserById(userId);
+        int balanceBefore = localUser == null
+                ? QuizApplication.getCurrencyBalance(appContext)
+                : localUser.currencyBalance;
+        int balanceAfter = balanceBefore + 1000;
+
+        PendingCurrencyOperationEntity pending = new PendingCurrencyOperationEntity();
+        pending.operationId = "topup_test_" + UUID.randomUUID();
+        pending.userId = userId;
+        pending.source = "test";
+        pending.amount = 1000;
+        pending.createdAt = System.currentTimeMillis();
+
+        quizDatabase.runInTransaction(() -> {
+            if (localUser != null) {
+                quizDao.updateUserCurrencyBalance(userId, balanceAfter);
+            }
+            quizDao.upsertPendingCurrencyOperation(pending);
+        });
+        QuizApplication.setDisplayedCurrencyBalance(appContext, balanceAfter);
+        android.util.Log.i("QuizRepository", "test-top-up: local before=" + balanceBefore
+                + ", after=" + balanceAfter + ", operation=" + pending.operationId);
+        QuizApiModels.ActionResponse response = new QuizApiModels.ActionResponse();
+        response.balance = balanceAfter;
+        return response;
     }
 
     public QuizApiModels.ActionResponse topUpAdCurrency() throws Exception {
@@ -1364,6 +1473,14 @@ public class QuizRepository {
         int localBalanceBefore = appContext == null
                 ? -1
                 : QuizApplication.getCurrencyBalance(appContext);
+        // Do not let a bootstrap with the old server balance overwrite an
+        // optimistic offline test reward that is still waiting in the outbox.
+        if (quizDao.countPendingCurrencyOperationsForUser(serverUser.id) > 0) {
+            UserEntity optimisticUser = quizDao.getUserById(serverUser.id);
+            if (optimisticUser != null) {
+                serverUser.currencyBalance = optimisticUser.currencyBalance;
+            }
+        }
         quizDao.upsertUser(serverUser);
         if (appContext != null && bootstrap.users != null && !bootstrap.users.isEmpty()) {
             // The server is authoritative after outboxes have been flushed.
@@ -1375,8 +1492,54 @@ public class QuizRepository {
         }
         quizDao.upsertAssets(mapAssets(bootstrap.assets));
         quizDao.upsertUserAssets(mapUserAssets(bootstrap.userAssets));
+        persistSelectedAssetPreferences(bootstrap);
         quizDao.upsertCurrencyTransactions(mapTransactions(bootstrap.currencyTransactions));
         quizDao.upsertSessions(mapSessions(bootstrap.quizSessions));
+    }
+
+    /**
+     * The screens render the active frame/crown from preferences, while the
+     * server stores the authoritative selection in user_assets. Copy the
+     * server selection during bootstrap so a fresh install shows the same
+     * profile immediately, without opening the Assets screen first.
+     */
+    private void persistSelectedAssetPreferences(BootstrapDto bootstrap) {
+        if (appContext == null || bootstrap.assets == null || bootstrap.userAssets == null) {
+            return;
+        }
+
+        String selectedFrameCode = null;
+        String selectedCrownCode = null;
+        for (BootstrapDto.UserAssetDto userAsset : bootstrap.userAssets) {
+            if (userAsset == null || !userAsset.selected) {
+                continue;
+            }
+            for (BootstrapDto.AssetDto asset : bootstrap.assets) {
+                if (asset == null || asset.id != userAsset.assetId) {
+                    continue;
+                }
+                String assetCode = safeString(asset.assetCode, String.valueOf(asset.id));
+                if ("FRAME".equalsIgnoreCase(asset.assetType)) {
+                    selectedFrameCode = assetCode;
+                } else if ("CROWN".equalsIgnoreCase(asset.assetType)) {
+                    selectedCrownCode = assetCode;
+                }
+                break;
+            }
+        }
+
+        SharedPreferences.Editor editor = PreferenceManager
+                .getDefaultSharedPreferences(appContext)
+                .edit();
+        if (selectedFrameCode != null) {
+            editor.putString("pref_assets_selected_FRAME", selectedFrameCode);
+        }
+        if (selectedCrownCode != null) {
+            editor.putString("pref_assets_selected_CROWN", selectedCrownCode);
+        }
+        editor.apply();
+        android.util.Log.i("QuizRepository", "bootstrap: selected assets restored, frame="
+                + selectedFrameCode + ", crown=" + selectedCrownCode);
     }
 
     private void saveBootstrapQuestions(BootstrapDto bootstrap) {

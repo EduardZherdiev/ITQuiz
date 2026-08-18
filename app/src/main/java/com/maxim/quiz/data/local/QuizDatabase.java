@@ -21,6 +21,7 @@ import com.maxim.quiz.data.local.entity.UserAssetEntity;
 import com.maxim.quiz.data.local.entity.UserEntity;
 import com.maxim.quiz.data.local.entity.OfflineQuizSessionEntity;
 import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
+import com.maxim.quiz.data.local.entity.PendingCurrencyOperationEntity;
 
 @Database(
         entities = {
@@ -36,9 +37,10 @@ import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
                 UserAssetEntity.class,
                 CurrencyTransactionEntity.class,
                 OfflineQuizSessionEntity.class,
-                PendingAssetOperationEntity.class
+                PendingAssetOperationEntity.class,
+                PendingCurrencyOperationEntity.class
         },
-            version = 7,
+            version = 8,
         exportSchema = false
 )
 public abstract class QuizDatabase extends RoomDatabase {
@@ -83,6 +85,22 @@ public abstract class QuizDatabase extends RoomDatabase {
         }
     };
 
+    public static final Migration MIGRATION_7_8 = new Migration(7, 8) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS pending_currency_operations (" +
+                    "operation_id TEXT NOT NULL PRIMARY KEY, " +
+                    "user_id TEXT NOT NULL, " +
+                    "source TEXT NOT NULL, " +
+                    "amount INTEGER NOT NULL, " +
+                    "created_at INTEGER NOT NULL)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_pending_currency_operations_user_id " +
+                    "ON pending_currency_operations (user_id)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_pending_currency_operations_created_at " +
+                    "ON pending_currency_operations (created_at)");
+        }
+    };
+
     private static volatile QuizDatabase INSTANCE;
 
     public abstract QuizDao quizDao();
@@ -97,7 +115,7 @@ public abstract class QuizDatabase extends RoomDatabase {
                                     "quiz.db"
                             )
                                     .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                             .fallbackToDestructiveMigration()
                             .build();
                 }
