@@ -188,6 +188,8 @@ GitHub: github.com/example/quiz</string>
     <string name="startup_server_unavailable">Server is unavailable right now. Try again later.</string>
     <string name="startup_retry">Retry</string>
     <string name="startup_progress_percent">%1$d%%</string>
+    <string name="startup_progress_download">Downloaded %1$s / %2$s (%3$d%%)</string>
+    <string name="startup_progress_unknown">unknown</string>
     <string name="offline_mode_started">Offline mode: the stake was saved locally.</string>
     <string name="offline_result_saved">Result saved locally. It will sync when the connection returns.</string>
     <string name="network_retrying">Connection lost. Retrying…</string>
@@ -204,6 +206,7 @@ GitHub: github.com/example/quiz</string>
     <string name="settings_google_play_title">Google Play Games</string>
     <string name="settings_google_play_connected">Connected</string>
     <string name="settings_google_play_not_connected">Not connected</string>
+    <string name="settings_google_play_disconnected">Disconnected on this device</string>
     <string name="settings_google_play_not_configured">Play Games setup is required</string>
     <string name="settings_google_play_connect_title">Connect Google Play Games</string>
     <string name="settings_google_play_connect_summary">Sync your game progress across devices</string>

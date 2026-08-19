@@ -47,11 +47,14 @@ public final class PlayGamesAccountManager {
     }
 
     public static String getStatusSummary(Context context) {
-        if (!isConfigured()) {
-            return context.getString(R.string.settings_google_play_not_configured);
-        }
         if (isLinked(context)) {
             return context.getString(R.string.settings_google_play_connected);
+        }
+        if (preferences(context).getBoolean(PREF_SIGNED_OUT, false)) {
+            return context.getString(R.string.settings_google_play_disconnected);
+        }
+        if (!isConfigured()) {
+            return context.getString(R.string.settings_google_play_not_configured);
         }
         return context.getString(R.string.settings_google_play_not_connected);
     }

@@ -182,6 +182,8 @@ GitHub: github.com/example/quiz</string>
     <string name="startup_server_unavailable">Сервер сейчас недоступен. Попробуйте позже.</string>
     <string name="startup_retry">Повторить</string>
     <string name="startup_progress_percent">%1$d%%</string>
+    <string name="startup_progress_download">Загружено %1$s / %2$s (%3$d%%)</string>
+    <string name="startup_progress_unknown">неизвестно</string>
     <string name="offline_mode_started">Офлайн-режим: ставка сохранена локально.</string>
     <string name="offline_result_saved">Результат сохранён локально. Он синхронизируется после восстановления соединения.</string>
     <string name="network_retrying">Соединение потеряно. Повторная попытка…</string>
@@ -198,6 +200,7 @@ GitHub: github.com/example/quiz</string>
     <string name="settings_google_play_title">Google Play Games</string>
     <string name="settings_google_play_connected">Подключен</string>
     <string name="settings_google_play_not_connected">Не подключен</string>
+    <string name="settings_google_play_disconnected">Отключен на этом устройстве</string>
     <string name="settings_google_play_not_configured">Требуется настройка Play Games</string>
     <string name="settings_google_play_connect_title">Подключить Google Play Games</string>
     <string name="settings_google_play_connect_summary">Синхронизация прогресса между устройствами</string>

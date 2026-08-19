@@ -23,7 +23,6 @@ import java.util.concurrent.Semaphore;
 public class StartupActivity extends AppCompatActivity {
 
     private static final String KEY_STARTUP_COMPLETED = "pref_startup_completed";
-    private static final long PROGRESS_TICK_MS = 90L;
     private static final long TEST_STEP_DELAY_MS = 1200L;
     private static final String TAG = "StartupActivity";
 
@@ -34,18 +33,6 @@ public class StartupActivity extends AppCompatActivity {
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable progressTick = new Runnable() {
-        @Override
-        public void run() {
-            if (finished || progressValue >= 95) {
-                return;
-            }
-            progressValue = Math.min(95, progressValue + 2);
-            updateProgressUi();
-            handler.postDelayed(this, PROGRESS_TICK_MS);
-        }
-    };
-
     private ProgressBar progressBar;
     private TextView progressText;
     private TextView statusText;
@@ -56,6 +43,8 @@ public class StartupActivity extends AppCompatActivity {
     private QuizRepository repository;
     private String language;
     private int progressValue;
+    private long downloadedBytes;
+    private long totalBytes;
     private boolean finished;
     private Stage currentStage = Stage.INTRO;
     private boolean bootstrapFinished;
@@ -103,11 +92,6 @@ public class StartupActivity extends AppCompatActivity {
         if (finished) {
             return;
         }
-        if (!NetworkState.isAvailable(this)) {
-            showError(R.string.startup_network_required);
-            return;
-        }
-
         bootstrapFinished = false;
         currentStage = Stage.BOOTSTRAP;
         errorGroup.setVisibility(View.GONE);
@@ -119,14 +103,19 @@ public class StartupActivity extends AppCompatActivity {
                 + ", network=" + NetworkState.isAvailable(this)
                 + ", apiBaseUrl=" + BuildConfig.QUIZ_API_BASE_URL);
         progressValue = 0;
+        downloadedBytes = 0L;
+        totalBytes = 0L;
         updateProgressUi();
-        handler.removeCallbacks(progressTick);
-        handler.post(progressTick);
 
         activeFlowCallback = new BootstrapFlowCallback() {
             @Override
             public void onStageChanged(BootstrapStage stage, String message) {
                 runOnUiThread(() -> handleBootstrapStage(stage));
+            }
+
+            @Override
+            public void onDownloadProgress(long bytesRead, long contentLength) {
+                runOnUiThread(() -> handleDownloadProgress(bytesRead, contentLength));
             }
 
             @Override
@@ -156,8 +145,10 @@ public class StartupActivity extends AppCompatActivity {
         if (finished) {
             return;
         }
-        handler.removeCallbacks(progressTick);
         progressValue = 100;
+        if (totalBytes > 0) {
+            downloadedBytes = totalBytes;
+        }
         updateProgressUi();
         bootstrapFinished = true;
         currentStage = Stage.READY;
@@ -174,8 +165,9 @@ public class StartupActivity extends AppCompatActivity {
     }
 
     private void showError(int messageRes) {
-        handler.removeCallbacks(progressTick);
         progressValue = 0;
+        downloadedBytes = 0L;
+        totalBytes = 0L;
         updateProgressUi();
         statusText.setText(messageRes);
         loadingText.setText(R.string.startup_loading_data);
@@ -252,8 +244,35 @@ public class StartupActivity extends AppCompatActivity {
     }
 
     private void updateProgressUi() {
+        progressBar.setIndeterminate(
+                currentStage == Stage.BOOTSTRAP && totalBytes <= 0 && !bootstrapFinished
+        );
         progressBar.setProgress(progressValue);
-        progressText.setText(getString(R.string.startup_progress_percent, progressValue));
+        progressText.setText(getString(
+                R.string.startup_progress_download,
+                formatBytes(downloadedBytes),
+                totalBytes > 0 ? formatBytes(totalBytes) : getString(R.string.startup_progress_unknown),
+                progressValue
+        ));
+    }
+
+    private void handleDownloadProgress(long bytesRead, long contentLength) {
+        if (finished || currentStage != Stage.BOOTSTRAP) {
+            return;
+        }
+        downloadedBytes = Math.max(0L, bytesRead);
+        totalBytes = Math.max(0L, contentLength);
+        if (totalBytes > 0) {
+            progressValue = (int) Math.min(99L, (downloadedBytes * 100L) / totalBytes);
+        }
+        updateProgressUi();
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024L * 1024L) {
+            return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
+        }
+        return String.format(java.util.Locale.US, "%.2f MB", bytes / (1024.0 * 1024.0));
     }
 
     private String describeLanguage(String lang) {

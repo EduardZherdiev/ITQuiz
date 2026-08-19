@@ -263,6 +263,7 @@ public class SettingsActivity extends AppCompatActivity {
             Preference accountPreference = findPreference(KEY_GOOGLE_PLAY_ACCOUNT);
             Preference connectPreference = findPreference(KEY_GOOGLE_PLAY_CONNECT);
             Preference logoutPreference = findPreference(KEY_GOOGLE_PLAY_LOGOUT);
+            Preference resetPreference = findPreference(KEY_RESET_GAME_DATA);
             if (accountPreference != null) {
                 accountPreference.setSummary(PlayGamesAccountManager.getStatusSummary(requireContext()));
             }
@@ -270,7 +271,14 @@ public class SettingsActivity extends AppCompatActivity {
                 connectPreference.setEnabled(PlayGamesAccountManager.isConfigured());
             }
             if (logoutPreference != null) {
-                logoutPreference.setEnabled(PlayGamesAccountManager.isLinked(requireContext()));
+                // Local Quiz logout must remain available even when Play Games
+                // credentials were not configured or the SDK is unavailable.
+                logoutPreference.setEnabled(true);
+            }
+            if (resetPreference != null) {
+                // Reset uses the current Quiz session (anonymous or linked),
+                // so it must never depend on Play Games configuration.
+                resetPreference.setEnabled(true);
             }
         }
 
@@ -289,6 +297,9 @@ public class SettingsActivity extends AppCompatActivity {
                 connectPreference.setEnabled(false);
             }
             PlayGamesAccountManager.signInAndLink(activity, (success, error) -> {
+                if (!isAdded()) {
+                    return;
+                }
                 updateGooglePlayPreferences();
                 if (success) {
                     Toast.makeText(requireContext(), R.string.settings_google_play_connected_message, Toast.LENGTH_SHORT).show();
@@ -323,9 +334,14 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private void resetGameData(Preference resetPreference) {
-            Context context = requireContext().getApplicationContext();
+            SettingsActivity hostActivity = getActivity() instanceof SettingsActivity
+                    ? (SettingsActivity) getActivity() : null;
+            if (hostActivity == null) {
+                return;
+            }
+            Context context = hostActivity.getApplicationContext();
             if (!NetworkState.isAvailable(context)) {
-                Toast.makeText(requireContext(), R.string.settings_reset_requires_connection, Toast.LENGTH_LONG).show();
+                Toast.makeText(hostActivity, R.string.settings_reset_requires_connection, Toast.LENGTH_LONG).show();
                 return;
             }
             resetPreference.setEnabled(false);
@@ -334,15 +350,21 @@ public class SettingsActivity extends AppCompatActivity {
                     QuizRepository repository = QuizRepository.create(context);
                     repository.resetGameDataBlocking();
                     repository.syncBootstrapBlocking(QuizLanguage.current(context));
-                    requireActivity().runOnUiThread(() -> {
+                    hostActivity.runOnUiThread(() -> {
+                        resetPreference.setEnabled(true);
+                        if (!isAdded()) {
+                            return;
+                        }
                         updateGooglePlayPreferences();
-                        Toast.makeText(requireContext(), R.string.settings_reset_game_data_success, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(hostActivity, R.string.settings_reset_game_data_success, Toast.LENGTH_SHORT).show();
                     });
                 } catch (Throwable error) {
                     Log.e(TAG, "Could not reset game data", error);
-                    requireActivity().runOnUiThread(() -> {
+                    hostActivity.runOnUiThread(() -> {
                         resetPreference.setEnabled(true);
-                        Toast.makeText(requireContext(), R.string.settings_reset_game_data_failed, Toast.LENGTH_LONG).show();
+                        if (isAdded()) {
+                            Toast.makeText(hostActivity, R.string.settings_reset_game_data_failed, Toast.LENGTH_LONG).show();
+                        }
                     });
                 }
             }, "quiz-reset-game-data").start();

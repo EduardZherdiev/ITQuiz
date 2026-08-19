@@ -28,6 +28,7 @@ import com.maxim.quiz.data.local.entity.PendingAssetOperationEntity;
 import com.maxim.quiz.data.local.entity.PendingCurrencyOperationEntity;
 import com.maxim.quiz.data.local.model.TopicCardRow;
 import com.maxim.quiz.data.remote.QuizRemoteDataSource;
+import com.maxim.quiz.data.remote.QuizApiClient;
 import com.maxim.quiz.data.remote.dto.BootstrapDto;
 import com.maxim.quiz.data.remote.dto.QuizApiModels;
 import androidx.preference.PreferenceManager;
@@ -35,7 +36,9 @@ import androidx.preference.PreferenceManager;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +52,9 @@ import java.io.IOException;
 public class QuizRepository {
 
     private static final long NETWORK_OPERATION_BUDGET_MS = 5000L;
-    private static final long BOOTSTRAP_DOWNLOAD_BUDGET_MS = 20000L;
+    // Catalog bootstrap may wake a sleeping Render instance. Keep ordinary
+    // actions fast, but give the first visible loading screen enough time.
+    private static final long BOOTSTRAP_DOWNLOAD_BUDGET_MS = 45000L;
     private static final int MAX_NETWORK_ATTEMPTS = 2;
 
     private static final String PREF_AUTH_TOKEN = "pref_auth_token";
@@ -83,6 +88,10 @@ public class QuizRepository {
         void onStageChanged(BootstrapStage stage, String message);
 
         void awaitNext() throws InterruptedException;
+
+        default void onDownloadProgress(long bytesRead, long contentLength) {
+            // Optional for callers that only need stage notifications.
+        }
     }
 
     public static final class AssetPurchaseResult {
@@ -155,7 +164,7 @@ public class QuizRepository {
             syncOfflineSessionsBlocking();
             syncPendingAssetOperationsBlocking();
             syncPendingCurrencyOperationsBlocking();
-            BootstrapBundle bundle = fetchBootstrapBundle(language);
+                BootstrapBundle bundle = fetchBootstrapBundle(language, null);
             quizDatabase.runInTransaction(() -> prepareLanguageCache(bundle.languages));
             quizDatabase.runInTransaction(() -> {
                 saveBootstrapTopics(bundle.primary);
@@ -358,7 +367,10 @@ public class QuizRepository {
                     request.flowCallback.onStageChanged(BootstrapStage.CONNECTING, "connecting");
                     request.flowCallback.awaitNext();
                 }
-                BootstrapBundle bundle = request.repository.fetchBootstrapBundle(request.language);
+                BootstrapBundle bundle = request.repository.fetchBootstrapBundle(
+                        request.language,
+                        request.flowCallback
+                );
                 final BootstrapBundle syncedBundle = bundle;
                 request.repository.quizDatabase.runInTransaction(
                         () -> request.repository.prepareLanguageCache(syncedBundle.languages)
@@ -401,40 +413,95 @@ public class QuizRepository {
     }
 
     /** Downloads the requested language and English in parallel. */
-    private BootstrapBundle fetchBootstrapBundle(String language) throws Exception {
+    private BootstrapBundle fetchBootstrapBundle(
+            String language,
+            BootstrapFlowCallback flowCallback
+    ) throws Exception {
         String normalized = normalizeLanguage(language);
-        if ("en".equals(normalized)) {
-            BootstrapDto english = fetchBootstrapWithRetries("en");
-            return new BootstrapBundle(english, english, Arrays.asList("en"));
+        BootstrapDownloadTracker tracker = flowCallback == null
+                ? null
+                : new BootstrapDownloadTracker(flowCallback);
+        if (tracker != null) {
+            QuizApiClient.setBootstrapProgressListener(tracker);
+        }
+        try {
+            if ("en".equals(normalized)) {
+                BootstrapDto english = fetchBootstrapWithRetries(
+                        "en",
+                        BOOTSTRAP_DOWNLOAD_BUDGET_MS
+                );
+                return new BootstrapBundle(english, english, Arrays.asList("en"));
+            }
+            // Authenticate once before starting the two parallel downloads. This
+            // avoids two anonymous users being created for the same device during
+            // the first dual-language bootstrap.
+            authenticateIfNeeded();
+            ExecutorService parallel = Executors.newFixedThreadPool(2);
+            try {
+                // English is retained locally after the first bootstrap. Download
+                // only the missing language on later switches so a cold Render
+                // wake-up does not unnecessarily double the request time.
+                if (isLanguageCached("en")) {
+                    BootstrapDto primary = fetchBootstrapWithRetries(
+                            normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS
+                    );
+                    return new BootstrapBundle(primary, null, Arrays.asList(normalized));
+                }
+                Future<BootstrapDto> primaryFuture = parallel.submit(
+                        () -> fetchBootstrapWithRetries(normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS)
+                );
+                Future<BootstrapDto> englishFuture = parallel.submit(
+                        () -> fetchBootstrapWithRetries("en", BOOTSTRAP_DOWNLOAD_BUDGET_MS)
+                );
+                long deadline = System.nanoTime() + BOOTSTRAP_DOWNLOAD_BUDGET_MS * 1_000_000L;
+                BootstrapDto primary = primaryFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
+                BootstrapDto english = englishFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
+                return new BootstrapBundle(primary, english, Arrays.asList(normalized, "en"));
+            } finally {
+                parallel.shutdownNow();
+            }
+        } finally {
+            if (tracker != null) {
+                QuizApiClient.setBootstrapProgressListener(null);
+            }
+        }
+    }
+
+    private static final class BootstrapDownloadTracker
+            implements QuizApiClient.BootstrapProgressListener {
+        private final BootstrapFlowCallback callback;
+        private final Map<String, Long> loadedByRequest = new HashMap<>();
+        private final Map<String, Long> totalByRequest = new HashMap<>();
+
+        BootstrapDownloadTracker(BootstrapFlowCallback callback) {
+            this.callback = callback;
         }
 
-        // Authenticate once before starting the two parallel downloads. This
-        // avoids two anonymous users being created for the same device during
-        // the first dual-language bootstrap.
-        authenticateIfNeeded();
-        ExecutorService parallel = Executors.newFixedThreadPool(2);
-        try {
-            // English is retained locally after the first bootstrap. Download
-            // only the missing language on later switches so a cold Render
-            // wake-up does not unnecessarily double the request time.
-            if (isLanguageCached("en")) {
-                BootstrapDto primary = fetchBootstrapWithRetries(
-                        normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS
-                );
-                return new BootstrapBundle(primary, null, Arrays.asList(normalized));
+        @Override
+        public synchronized void onProgress(
+                String requestKey,
+                long bytesRead,
+                long contentLength
+        ) {
+            Long previous = loadedByRequest.get(requestKey);
+            // A retry uses the same URL and starts reading from zero again.
+            if (previous != null && bytesRead < previous) {
+                loadedByRequest.put(requestKey, bytesRead);
+            } else {
+                loadedByRequest.put(requestKey, bytesRead);
             }
-            Future<BootstrapDto> primaryFuture = parallel.submit(
-                    () -> fetchBootstrapWithRetries(normalized, BOOTSTRAP_DOWNLOAD_BUDGET_MS)
-            );
-            Future<BootstrapDto> englishFuture = parallel.submit(
-                    () -> fetchBootstrapWithRetries("en", BOOTSTRAP_DOWNLOAD_BUDGET_MS)
-            );
-            long deadline = System.nanoTime() + BOOTSTRAP_DOWNLOAD_BUDGET_MS * 1_000_000L;
-            BootstrapDto primary = primaryFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
-            BootstrapDto english = englishFuture.get(remainingMillis(deadline), TimeUnit.MILLISECONDS);
-            return new BootstrapBundle(primary, english, Arrays.asList(normalized, "en"));
-        } finally {
-            parallel.shutdownNow();
+            if (contentLength > 0) {
+                totalByRequest.put(requestKey, contentLength);
+            }
+            long loaded = 0L;
+            long total = 0L;
+            for (long value : loadedByRequest.values()) {
+                loaded += value;
+            }
+            for (long value : totalByRequest.values()) {
+                total += value;
+            }
+            callback.onDownloadProgress(loaded, total);
         }
     }
 
@@ -571,6 +638,13 @@ public class QuizRepository {
         if (serverAuthCode == null || serverAuthCode.trim().isEmpty()) {
             throw new IllegalArgumentException("Play Games server auth code is empty");
         }
+        // Finish operations created under the current anonymous session before
+        // the server can switch the access token to the Play Games account.
+        // Otherwise an old offline debit/reward could be attributed to the new
+        // account or appear to be restored after the link.
+        syncOfflineSessionsBlocking();
+        syncPendingAssetOperationsBlocking();
+        syncPendingCurrencyOperationsBlocking();
         QuizApiModels.AuthResponse response = withAuthenticatedAuthResponseRetries(
                 token -> remoteDataSource.linkPlayGamesAccount(token, serverAuthCode)
         );
