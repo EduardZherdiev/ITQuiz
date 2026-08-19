@@ -6,6 +6,7 @@ import android.graphics.drawable.AnimationDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -40,6 +41,16 @@ public class QuestionActivity extends AppCompatActivity {
     private static final int QUESTION_TIME_SECONDS = 20;
     private static final int TIMER_PROGRESS_MULTIPLIER = 100;
     private static final long TIMER_ANIMATION_FRAME_MS = 16L;
+    private static final String STATE_CURRENT_QUESTION_INDEX = "state_current_question_index";
+    private static final String STATE_SCORE = "state_score";
+    private static final String STATE_OPPONENT_SCORE = "state_opponent_score";
+    private static final String STATE_HUMAN_QUESTION_RESOLVED = "state_human_question_resolved";
+    private static final String STATE_COMPUTER_QUESTION_RESOLVED = "state_computer_question_resolved";
+    private static final String STATE_NEXT_QUESTION_SCHEDULED = "state_next_question_scheduled";
+    private static final String STATE_ANSWER_LOCKED = "state_answer_locked";
+    private static final String STATE_SELECTED_ANSWERS = "state_selected_answers";
+    private static final String STATE_TIMER_DEADLINE = "state_timer_deadline";
+    private static final String STATE_TIMER_QUESTION_INDEX = "state_timer_question_index";
     public static final String EXTRA_SESSION_ID = "extra_session_id";
     public static final String EXTRA_REVIEW_LINES = "extra_review_lines";
     private static final String EXTRA_SCORE = "extra_score";
@@ -92,6 +103,9 @@ public class QuestionActivity extends AppCompatActivity {
     private int selectedCurrency;
     private String sessionId;
     private ValueAnimator questionTimerAnimator;
+    private long questionTimerDeadlineElapsedRealtime;
+    private int timerQuestionIndex = -1;
+    private boolean restoringQuestionState;
     private Runnable computerAnswerRunnable;
     private Runnable nextQuestionRunnable;
     private boolean answerLocked;
@@ -112,6 +126,8 @@ public class QuestionActivity extends AppCompatActivity {
         gameMode = getIntent().getStringExtra(GameModeActivity.EXTRA_GAME_MODE);
         questionLimit = getIntent().getIntExtra(GameModeActivity.EXTRA_QUESTION_LIMIT, getQuestionLimit(difficultyMode));
         sessionId = getIntent().getStringExtra(EXTRA_SESSION_ID);
+
+        restoreQuestionState(savedInstanceState);
 
         if (topicAbbr == null || topicAbbr.isEmpty()) {
             topicAbbr = "DB";
@@ -266,8 +282,10 @@ public class QuestionActivity extends AppCompatActivity {
                     }
                     runOnUiThread(() -> {
                         hideQuestionLoading();
-                        selectedAnswerIndexes = new int[questions.size()];
-                        Arrays.fill(selectedAnswerIndexes, -1);
+                        if (selectedAnswerIndexes == null || selectedAnswerIndexes.length != questions.size()) {
+                            selectedAnswerIndexes = new int[questions.size()];
+                            Arrays.fill(selectedAnswerIndexes, -1);
+                        }
                         showCurrentQuestion();
                     });
                     return;
@@ -314,11 +332,17 @@ public class QuestionActivity extends AppCompatActivity {
     }
 
     private void showCurrentQuestion() {
-        answerLocked = false;
-        humanQuestionResolved = false;
-        computerQuestionResolved = isSoloMode() || !"computer".equalsIgnoreCase(gameMode);
-        nextQuestionScheduled = false;
-        clearPendingQuestionCallbacks();
+        boolean restoring = restoringQuestionState
+                && timerQuestionIndex == currentQuestionIndex
+                && currentQuestionIndex >= 0
+                && currentQuestionIndex < questions.size();
+        if (!restoring) {
+            answerLocked = false;
+            humanQuestionResolved = false;
+            computerQuestionResolved = isSoloMode() || !"computer".equalsIgnoreCase(gameMode);
+            nextQuestionScheduled = false;
+            clearPendingQuestionCallbacks();
+        }
         QuestionItem questionItem = questions.get(currentQuestionIndex);
         correctAnswersText.setText(String.valueOf(score));
         if (correctAnswersOpponentText != null) {
@@ -342,11 +366,21 @@ public class QuestionActivity extends AppCompatActivity {
             answerButton.setOnClickListener(v -> handleAnswerClick(selectedIndex));
         }
 
-        startQuestionTimer();
-        if (!isSoloMode() && "computer".equalsIgnoreCase(gameMode)) {
+        if (!answerLocked) {
+            startQuestionTimer();
+        }
+        if (!restoring && !isSoloMode() && "computer".equalsIgnoreCase(gameMode)) {
             long randomDelay = COMPUTER_MIN_DELAY_MS + (long) (Math.random() * (COMPUTER_MAX_DELAY_MS - COMPUTER_MIN_DELAY_MS + 1));
             scheduleComputerAnswer(randomDelay);
+        } else if (restoring && nextQuestionScheduled) {
+            // Handler callbacks do not survive configuration changes.
+            nextQuestionScheduled = false;
+            scheduleNextQuestion(ANSWER_DELAY_MS);
+        } else if (restoring && !isSoloMode() && "computer".equalsIgnoreCase(gameMode)
+                && !computerQuestionResolved) {
+            scheduleComputerAnswer(COMPUTER_AFTER_USER_DELAY_MS);
         }
+        restoringQuestionState = false;
     }
 
     private void handleAnswerClick(int selectedIndex) {
@@ -506,12 +540,27 @@ public class QuestionActivity extends AppCompatActivity {
 
     private void startQuestionTimer() {
         stopQuestionTimer();
-        questionTimerText.setText(String.valueOf(QUESTION_TIME_SECONDS));
         final int maxProgress = QUESTION_TIME_SECONDS * TIMER_PROGRESS_MULTIPLIER;
-        questionTimerProgress.setProgress(maxProgress);
 
-        questionTimerAnimator = ValueAnimator.ofInt(maxProgress, 0);
-        questionTimerAnimator.setDuration(QUESTION_TIME_SECONDS * 1000L);
+        long now = SystemClock.elapsedRealtime();
+        if (timerQuestionIndex != currentQuestionIndex) {
+            timerQuestionIndex = currentQuestionIndex;
+            questionTimerDeadlineElapsedRealtime = now + QUESTION_TIME_SECONDS * 1000L;
+        }
+
+        long remainingMs = Math.max(0L, questionTimerDeadlineElapsedRealtime - now);
+        int remainingProgress = (int) Math.min(maxProgress,
+                Math.ceil(remainingMs / 1000.0 * TIMER_PROGRESS_MULTIPLIER));
+        questionTimerText.setText(String.valueOf((int) Math.ceil(remainingMs / 1000.0)));
+        questionTimerProgress.setProgress(remainingProgress);
+
+        if (remainingMs <= 0L) {
+            handleQuestionTimeout();
+            return;
+        }
+
+        questionTimerAnimator = ValueAnimator.ofInt(remainingProgress, 0);
+        questionTimerAnimator.setDuration(remainingMs);
         questionTimerAnimator.setInterpolator(new LinearInterpolator());
         questionTimerAnimator.setRepeatCount(0);
         questionTimerAnimator.setStartDelay(0L);
@@ -529,26 +578,30 @@ public class QuestionActivity extends AppCompatActivity {
         questionTimerAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(android.animation.Animator animation) {
-                if (answerLocked) {
-                    return;
-                }
-                answerLocked = true;
-                humanQuestionResolved = true;
-                selectedAnswerIndexes[currentQuestionIndex] = -1;
-                questionTimerText.setText("0");
-                questionTimerProgress.setProgress(0);
-
-                for (MaterialButton answerButton : answerButtons) {
-                    answerButton.setEnabled(false);
-                }
-
-                if (computerQuestionResolved) {
-                    scheduleNextQuestion(ANSWER_DELAY_MS);
-                }
+                handleQuestionTimeout();
             }
         });
         questionTimerAnimator.setFrameDelay(TIMER_ANIMATION_FRAME_MS);
         questionTimerAnimator.start();
+    }
+
+    private void handleQuestionTimeout() {
+        if (answerLocked) {
+            return;
+        }
+        answerLocked = true;
+        humanQuestionResolved = true;
+        selectedAnswerIndexes[currentQuestionIndex] = -1;
+        questionTimerText.setText("0");
+        questionTimerProgress.setProgress(0);
+
+        for (MaterialButton answerButton : answerButtons) {
+            answerButton.setEnabled(false);
+        }
+
+        if (computerQuestionResolved) {
+            scheduleNextQuestion(ANSWER_DELAY_MS);
+        }
     }
 
     private void stopQuestionTimer() {
@@ -558,6 +611,39 @@ public class QuestionActivity extends AppCompatActivity {
             questionTimerAnimator.removeAllUpdateListeners();
             questionTimerAnimator = null;
         }
+    }
+
+    private void restoreQuestionState(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        currentQuestionIndex = savedInstanceState.getInt(STATE_CURRENT_QUESTION_INDEX, 0);
+        score = savedInstanceState.getInt(STATE_SCORE, 0);
+        opponentScore = savedInstanceState.getInt(STATE_OPPONENT_SCORE, 0);
+        humanQuestionResolved = savedInstanceState.getBoolean(STATE_HUMAN_QUESTION_RESOLVED, false);
+        computerQuestionResolved = savedInstanceState.getBoolean(STATE_COMPUTER_QUESTION_RESOLVED, false);
+        nextQuestionScheduled = savedInstanceState.getBoolean(STATE_NEXT_QUESTION_SCHEDULED, false);
+        answerLocked = savedInstanceState.getBoolean(STATE_ANSWER_LOCKED, false);
+        selectedAnswerIndexes = savedInstanceState.getIntArray(STATE_SELECTED_ANSWERS);
+        questionTimerDeadlineElapsedRealtime = savedInstanceState.getLong(STATE_TIMER_DEADLINE, 0L);
+        timerQuestionIndex = savedInstanceState.getInt(STATE_TIMER_QUESTION_INDEX, -1);
+        restoringQuestionState = true;
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt(STATE_CURRENT_QUESTION_INDEX, currentQuestionIndex);
+        outState.putInt(STATE_SCORE, score);
+        outState.putInt(STATE_OPPONENT_SCORE, opponentScore);
+        outState.putBoolean(STATE_HUMAN_QUESTION_RESOLVED, humanQuestionResolved);
+        outState.putBoolean(STATE_COMPUTER_QUESTION_RESOLVED, computerQuestionResolved);
+        outState.putBoolean(STATE_NEXT_QUESTION_SCHEDULED, nextQuestionScheduled);
+        outState.putBoolean(STATE_ANSWER_LOCKED, answerLocked);
+        outState.putIntArray(STATE_SELECTED_ANSWERS, selectedAnswerIndexes);
+        outState.putLong(STATE_TIMER_DEADLINE, questionTimerDeadlineElapsedRealtime);
+        outState.putInt(STATE_TIMER_QUESTION_INDEX, timerQuestionIndex);
+        super.onSaveInstanceState(outState);
     }
 
     private void applyBlinkBackground(MaterialButton button, int backgroundRes, int finalBackgroundRes) {

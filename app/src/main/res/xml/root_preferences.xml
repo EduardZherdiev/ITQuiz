@@ -30,4 +30,28 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="@string/settings_category_account">
+
+        <Preference
+            app:key="pref_google_play_account"
+            app:title="@string/settings_google_play_title"
+            app:summary="@string/settings_google_play_not_connected" />
+
+        <Preference
+            app:key="pref_google_play_connect"
+            app:title="@string/settings_google_play_connect_title"
+            app:summary="@string/settings_google_play_connect_summary" />
+
+        <Preference
+            app:key="pref_google_play_logout"
+            app:title="@string/settings_google_play_logout_title"
+            app:summary="@string/settings_google_play_logout_summary" />
+
+        <Preference
+            app:key="pref_reset_game_data"
+            app:title="@string/settings_reset_game_data_title"
+            app:summary="@string/settings_reset_game_data_summary" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>

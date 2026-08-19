@@ -127,6 +127,10 @@ public class SettingsActivity extends AppCompatActivity {
         private static final String KEY_LANGUAGE = "pref_language";
         private static final String KEY_PROFILE_PHOTO = "pref_profile_photo";
         private static final String KEY_DISPLAY_NAME = "pref_user_display_name";
+        private static final String KEY_GOOGLE_PLAY_ACCOUNT = "pref_google_play_account";
+        private static final String KEY_GOOGLE_PLAY_CONNECT = "pref_google_play_connect";
+        private static final String KEY_GOOGLE_PLAY_LOGOUT = "pref_google_play_logout";
+        private static final String KEY_RESET_GAME_DATA = "pref_reset_game_data";
         private static final String PREF_PROFILE_PHOTO_URI = "pref_profile_photo_uri";
         private static final String PROFILE_PHOTO_FILE = "profile_photo.png";
 
@@ -144,6 +148,10 @@ public class SettingsActivity extends AppCompatActivity {
             ListPreference languagePreference = findPreference(KEY_LANGUAGE);
             Preference profilePhotoPreference = findPreference(KEY_PROFILE_PHOTO);
             EditTextPreference displayNamePreference = findPreference(KEY_DISPLAY_NAME);
+            Preference googlePlayAccountPreference = findPreference(KEY_GOOGLE_PLAY_ACCOUNT);
+            Preference googlePlayConnectPreference = findPreference(KEY_GOOGLE_PLAY_CONNECT);
+            Preference googlePlayLogoutPreference = findPreference(KEY_GOOGLE_PLAY_LOGOUT);
+            Preference resetGameDataPreference = findPreference(KEY_RESET_GAME_DATA);
 
             if (themePreference != null) {
                 themePreference.setOnPreferenceChangeListener(this);
@@ -175,6 +183,32 @@ public class SettingsActivity extends AppCompatActivity {
                     return false;
                 });
             }
+
+            if (googlePlayAccountPreference != null) {
+                googlePlayAccountPreference.setOnPreferenceClickListener(preference -> {
+                    connectGooglePlayGames();
+                    return true;
+                });
+            }
+            if (googlePlayConnectPreference != null) {
+                googlePlayConnectPreference.setOnPreferenceClickListener(preference -> {
+                    connectGooglePlayGames();
+                    return true;
+                });
+            }
+            if (googlePlayLogoutPreference != null) {
+                googlePlayLogoutPreference.setOnPreferenceClickListener(preference -> {
+                    confirmGooglePlayLogout();
+                    return true;
+                });
+            }
+            if (resetGameDataPreference != null) {
+                resetGameDataPreference.setOnPreferenceClickListener(preference -> {
+                    confirmResetGameData(preference);
+                    return true;
+                });
+            }
+            updateGooglePlayPreferences();
 
             galleryPicker = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
                 if (uri == null) {
@@ -217,6 +251,101 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             return false;
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            updateGooglePlayPreferences();
+        }
+
+        private void updateGooglePlayPreferences() {
+            Preference accountPreference = findPreference(KEY_GOOGLE_PLAY_ACCOUNT);
+            Preference connectPreference = findPreference(KEY_GOOGLE_PLAY_CONNECT);
+            Preference logoutPreference = findPreference(KEY_GOOGLE_PLAY_LOGOUT);
+            if (accountPreference != null) {
+                accountPreference.setSummary(PlayGamesAccountManager.getStatusSummary(requireContext()));
+            }
+            if (connectPreference != null) {
+                connectPreference.setEnabled(PlayGamesAccountManager.isConfigured());
+            }
+            if (logoutPreference != null) {
+                logoutPreference.setEnabled(PlayGamesAccountManager.isLinked(requireContext()));
+            }
+        }
+
+        private void connectGooglePlayGames() {
+            if (!PlayGamesAccountManager.isConfigured()) {
+                Toast.makeText(requireContext(), R.string.settings_google_play_not_configured, Toast.LENGTH_LONG).show();
+                return;
+            }
+            SettingsActivity activity = getActivity() instanceof SettingsActivity
+                    ? (SettingsActivity) getActivity() : null;
+            if (activity == null) {
+                return;
+            }
+            Preference connectPreference = findPreference(KEY_GOOGLE_PLAY_CONNECT);
+            if (connectPreference != null) {
+                connectPreference.setEnabled(false);
+            }
+            PlayGamesAccountManager.signInAndLink(activity, (success, error) -> {
+                updateGooglePlayPreferences();
+                if (success) {
+                    Toast.makeText(requireContext(), R.string.settings_google_play_connected_message, Toast.LENGTH_SHORT).show();
+                    activity.refreshProfilePreview();
+                } else {
+                    Toast.makeText(requireContext(), R.string.settings_google_play_link_failed, Toast.LENGTH_LONG).show();
+                    Log.e(TAG, "Play Games account link failed", error);
+                }
+            });
+        }
+
+        private void confirmGooglePlayLogout() {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.settings_google_play_logout_title)
+                    .setMessage(R.string.settings_google_play_logout_summary)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                        PlayGamesAccountManager.signOutFromQuiz(requireContext());
+                        updateGooglePlayPreferences();
+                        Toast.makeText(requireContext(), R.string.settings_google_play_logged_out, Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+        }
+
+        private void confirmResetGameData(Preference resetPreference) {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.settings_reset_game_data_title)
+                    .setMessage(R.string.settings_reset_game_data_confirm)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.settings_reset_game_data_action, (dialog, which) -> resetGameData(resetPreference))
+                    .show();
+        }
+
+        private void resetGameData(Preference resetPreference) {
+            Context context = requireContext().getApplicationContext();
+            if (!NetworkState.isAvailable(context)) {
+                Toast.makeText(requireContext(), R.string.settings_reset_requires_connection, Toast.LENGTH_LONG).show();
+                return;
+            }
+            resetPreference.setEnabled(false);
+            new Thread(() -> {
+                try {
+                    QuizRepository repository = QuizRepository.create(context);
+                    repository.resetGameDataBlocking();
+                    repository.syncBootstrapBlocking(QuizLanguage.current(context));
+                    requireActivity().runOnUiThread(() -> {
+                        updateGooglePlayPreferences();
+                        Toast.makeText(requireContext(), R.string.settings_reset_game_data_success, Toast.LENGTH_SHORT).show();
+                    });
+                } catch (Throwable error) {
+                    Log.e(TAG, "Could not reset game data", error);
+                    requireActivity().runOnUiThread(() -> {
+                        resetPreference.setEnabled(true);
+                        Toast.makeText(requireContext(), R.string.settings_reset_game_data_failed, Toast.LENGTH_LONG).show();
+                    });
+                }
+            }, "quiz-reset-game-data").start();
         }
 
         private void showProfilePhotoChooser() {

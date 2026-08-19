@@ -6,9 +6,9 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:paddingStart="18dp"
-    android:paddingTop="8dp"
+    android:paddingTop="4dp"
     android:paddingEnd="18dp"
-    android:paddingBottom="8dp"
+    android:paddingBottom="4dp"
     tools:context=".GameModeActivity">
 
     <TextView
@@ -19,7 +19,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:textColor="?attr/colorOnSurface"
-        android:textSize="25sp"
+        android:textSize="21sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -30,12 +30,12 @@
         android:id="@+id/gameModeTopicDescription"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="1dp"
         android:gravity="center"
         android:maxLines="1"
         android:ellipsize="end"
         android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="13sp"
+        android:textSize="11sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/gameModeTopicName"
@@ -45,8 +45,8 @@
         android:id="@+id/gameModeContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
@@ -61,29 +61,30 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:baselineAligned="false"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="8dp">
+            android:padding="4dp">
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:paddingEnd="8dp">
+                android:paddingEnd="4dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/difficulty_title"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.button.MaterialButtonToggleGroup
                     android:id="@+id/difficultyGroup"
                     android:layout_width="match_parent"
-                    android:layout_height="34dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_height="30dp"
+                    android:layout_marginTop="2dp"
                     app:selectionRequired="true"
                     app:singleSelection="true">
 
@@ -94,13 +95,13 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:includeFontPadding="false"
+                        android:insetLeft="0dp"
+                        android:insetRight="0dp"
                         android:minWidth="0dp"
                         android:paddingStart="0dp"
                         android:paddingEnd="0dp"
-                        android:insetLeft="0dp"
-                        android:insetRight="0dp"
                         android:text="@string/difficulty_basic"
-                        android:textSize="9sp" />
+                        android:textSize="8sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/difficultyCommon"
@@ -109,13 +110,13 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:includeFontPadding="false"
+                        android:insetLeft="0dp"
+                        android:insetRight="0dp"
                         android:minWidth="0dp"
                         android:paddingStart="0dp"
                         android:paddingEnd="0dp"
-                        android:insetLeft="0dp"
-                        android:insetRight="0dp"
                         android:text="@string/difficulty_common"
-                        android:textSize="9sp" />
+                        android:textSize="8sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/difficultyAdvanced"
@@ -124,28 +125,28 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:includeFontPadding="false"
+                        android:insetLeft="0dp"
+                        android:insetRight="0dp"
                         android:minWidth="0dp"
                         android:paddingStart="0dp"
                         android:paddingEnd="0dp"
-                        android:insetLeft="0dp"
-                        android:insetRight="0dp"
                         android:text="@string/difficulty_advanced"
-                        android:textSize="9sp" />
+                        android:textSize="8sp" />
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="3dp"
                     android:text="@string/game_mode_currency_title"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/currencySlider"
                     android:layout_width="match_parent"
-                    android:layout_height="30dp"
+                    android:layout_height="26dp"
                     android:layout_marginTop="1dp"
                     android:contentDescription="@string/game_mode_currency_title"
                     android:stepSize="1"
@@ -157,7 +158,7 @@
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/currencyLabels"
                     android:layout_width="match_parent"
-                    android:layout_height="22dp"
+                    android:layout_height="20dp"
                     android:layout_marginTop="0dp">
 
                     <androidx.constraintlayout.widget.Guideline
@@ -188,7 +189,7 @@
                         android:maxLines="1"
                         android:text="@string/currency_label_100"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
+                        android:textSize="9sp"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
 
@@ -199,7 +200,7 @@
                         android:maxLines="1"
                         android:text="@string/currency_label_1k"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
+                        android:textSize="9sp"
                         app:layout_constraintEnd_toEndOf="@+id/currencyGuideQuarter"
                         app:layout_constraintStart_toStartOf="@+id/currencyGuideQuarter"
                         app:layout_constraintTop_toTopOf="parent" />
@@ -211,7 +212,7 @@
                         android:maxLines="1"
                         android:text="@string/currency_label_10k"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
+                        android:textSize="9sp"
                         app:layout_constraintEnd_toEndOf="@+id/currencyGuideHalf"
                         app:layout_constraintStart_toStartOf="@+id/currencyGuideHalf"
                         app:layout_constraintTop_toTopOf="parent" />
@@ -223,7 +224,7 @@
                         android:maxLines="1"
                         android:text="@string/currency_label_100k"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
+                        android:textSize="9sp"
                         app:layout_constraintEnd_toEndOf="@+id/currencyGuideThreeQuarter"
                         app:layout_constraintStart_toStartOf="@+id/currencyGuideThreeQuarter"
                         app:layout_constraintTop_toTopOf="parent" />
@@ -235,7 +236,7 @@
                         android:maxLines="1"
                         android:text="@string/currency_label_1m"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
+                        android:textSize="9sp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
@@ -244,25 +245,25 @@
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:orientation="vertical"
-                android:paddingStart="12dp">
+                android:paddingStart="4dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/game_mode_choose_mode"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <LinearLayout
                     android:id="@+id/gameModeSoloRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
+                    android:layout_marginTop="3dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -271,8 +272,13 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:buttonTint="?attr/colorPrimary"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingTop="0dp"
+                        android:paddingBottom="0dp"
                         android:text="@string/game_mode_solo"
-                        android:textSize="14sp" />
+                        android:textSize="12sp" />
+
                     <TextView
                         android:id="@+id/gameModeLimitsSolo"
                         android:layout_width="0dp"
@@ -282,7 +288,7 @@
                         android:gravity="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
+                        android:textSize="9sp"
                         tools:text="15 questions · x2 · max 5K" />
                 </LinearLayout>
 
@@ -298,8 +304,13 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:buttonTint="?attr/colorPrimary"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingTop="0dp"
+                        android:paddingBottom="0dp"
                         android:text="@string/game_mode_two_players"
-                        android:textSize="14sp" />
+                        android:textSize="12sp" />
+
                     <TextView
                         android:id="@+id/gameModeLimitsPlayer"
                         android:layout_width="0dp"
@@ -309,7 +320,7 @@
                         android:gravity="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -324,8 +335,13 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:buttonTint="?attr/colorPrimary"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingTop="0dp"
+                        android:paddingBottom="0dp"
                         android:text="@string/game_mode_computer"
-                        android:textSize="14sp" />
+                        android:textSize="12sp" />
+
                     <TextView
                         android:id="@+id/gameModeLimitsComputer"
                         android:layout_width="0dp"
@@ -335,7 +351,7 @@
                         android:gravity="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
+                        android:textSize="9sp"
                         tools:text="15 questions · x2 · max 1K" />
                 </LinearLayout>
             </LinearLayout>
@@ -345,7 +361,7 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonPlay"
         android:layout_width="0dp"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:text="@string/game_mode_play"
         android:textSize="15sp"
         app:cornerRadius="14dp"

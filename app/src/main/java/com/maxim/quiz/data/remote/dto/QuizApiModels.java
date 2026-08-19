@@ -24,6 +24,15 @@ public final class QuizApiModels {
         public long expiresAt;
     }
 
+    public static class PlayGamesLinkRequest {
+        @SerializedName("server_auth_code")
+        public String serverAuthCode;
+
+        public PlayGamesLinkRequest(String serverAuthCode) {
+            this.serverAuthCode = serverAuthCode;
+        }
+    }
+
     public static class StartQuizRequest {
         @SerializedName("topic_id")
         public int topicId;

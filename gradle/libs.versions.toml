@@ -19,6 +19,7 @@ retrofit = "2.11.0"
 okhttpLogging = "4.12.0"
 googleMobileAds = "25.4.0"
 playBilling = "9.1.0"
+playGames = "21.0.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -42,6 +43,7 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttpLogging" }
 google-mobile-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "googleMobileAds" }
 play-billing = { group = "com.android.billingclient", name = "billing", version.ref = "playBilling" }
+play-games = { group = "com.google.android.gms", name = "play-services-games-v2", version.ref = "playGames" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

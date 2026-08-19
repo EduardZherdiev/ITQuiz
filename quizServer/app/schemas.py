@@ -138,6 +138,10 @@ class AnonymousAuthRequest(BaseModel):
     device_id: str = Field(min_length=8, max_length=128)
 
 
+class PlayGamesLinkRequest(BaseModel):
+    server_auth_code: str = Field(min_length=16, max_length=4096)
+
+
 class AuthResponse(BaseModel):
     user_id: str
     access_token: str

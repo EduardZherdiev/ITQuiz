@@ -4,7 +4,9 @@ import logging
 import os
 import time
 import uuid
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,7 @@ from app.schemas import (
     FinishQuizRequest,
     GooglePlayPurchaseRequest,
     OfflineQuizSyncRequest,
+    PlayGamesLinkRequest,
     PurchaseAssetRequest,
     QuizActionResponse,
     StartQuizRequest,
@@ -42,6 +45,9 @@ GOOGLE_PLAY_PRODUCTS = {
 AD_REWARD_AMOUNT = 1000
 AD_REWARD_ITEM = "coins"
 AD_SSV_KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json"
+GOOGLE_PLAY_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_PLAY_PLAYER_URL = "https://games.googleapis.com/games/v1/players/me"
+GOOGLE_PLAY_REQUEST_TIMEOUT_SECONDS = 5
 _admob_keys_cache: tuple[float, dict[int, object]] | None = None
 logger = logging.getLogger("quiz.monetization")
 balance_logger = logging.getLogger("quiz.balance")
@@ -110,6 +116,86 @@ def anonymous_auth(payload: AnonymousAuthRequest, db: Session = Depends(get_db))
 
     access_token, expires_at = issue_token(user.id)
     return AuthResponse(user_id=user.id, access_token=access_token, expires_at=expires_at)
+
+
+@app.post("/api/v1/auth/play-games/link", response_model=AuthResponse)
+def link_play_games_account(
+    payload: PlayGamesLinkRequest,
+    current_user_id: str = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    current_user = _require_user(db, current_user_id)
+    player = _verify_play_games_server_auth_code(payload.server_auth_code)
+    player_id = player.get("playerId")
+    if not player_id:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Google Play player verification failed")
+
+    google_uid = f"playgames:{player_id}"
+    linked_user = db.scalar(select(User).where(User.google_uid == google_uid))
+    if linked_user is not None and linked_user.id != current_user.id:
+        # A fresh anonymous install is only a temporary local identity. When
+        # the Play Games account already exists, switch to its canonical data
+        # instead of duplicating the account or adding the starter balance.
+        if current_user.google_uid and current_user.google_uid.startswith("playgames:"):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another Google Play account is already linked")
+        user = linked_user
+    else:
+        user = current_user
+        user.google_uid = google_uid
+
+    # The player API may omit profile data. Do not overwrite the app name with
+    # an empty value; the stable playerId is the actual account identity.
+    if not user.display_name or user.display_name == "Quiz Player":
+        user.display_name = player.get("displayName") or user.display_name or "Quiz Player"
+    user.last_login_at = int(time.time() * 1000)
+    db.commit()
+
+    access_token, expires_at = issue_token(user.id)
+    return AuthResponse(user_id=user.id, access_token=access_token, expires_at=expires_at)
+
+
+def _verify_play_games_server_auth_code(server_auth_code: str) -> dict:
+    client_id = os.getenv("GOOGLE_PLAY_SERVER_CLIENT_ID", "").strip()
+    client_secret = os.getenv("GOOGLE_PLAY_SERVER_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google Play server credentials are not configured",
+        )
+
+    token_payload = urlencode({
+        "code": server_auth_code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "authorization_code",
+        "redirect_uri": "",
+    }).encode("utf-8")
+    try:
+        token_request = UrlRequest(
+            GOOGLE_PLAY_TOKEN_URL,
+            data=token_payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urlopen(token_request, timeout=GOOGLE_PLAY_REQUEST_TIMEOUT_SECONDS) as response:
+            token_response = json.loads(response.read().decode("utf-8"))
+        access_token = token_response.get("access_token")
+        if not access_token:
+            raise ValueError("Google did not return an access token")
+
+        player_request = UrlRequest(
+            GOOGLE_PLAY_PLAYER_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            method="GET",
+        )
+        with urlopen(player_request, timeout=GOOGLE_PLAY_REQUEST_TIMEOUT_SECONDS) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as error:
+        logger.warning("Google Play player verification failed: %s", error)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Google Play account verification failed",
+        ) from error
 
 
 @app.get("/api/v1/bootstrap", response_model=BootstrapResponse)
@@ -310,6 +396,33 @@ def get_balance(user_id: str = Depends(require_user), db: Session = Depends(get_
     user = db.scalar(select(User).where(User.id == user_id))
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return QuizActionResponse(balance=user.currency_balance)
+
+
+@app.post("/api/v1/me/reset", response_model=QuizActionResponse)
+def reset_game_data(user_id: str = Depends(require_user), db: Session = Depends(get_db)) -> QuizActionResponse:
+    """Reset gameplay progress while keeping the Play Games identity linked."""
+    user = _locked_user(db, user_id)
+    now = int(time.time() * 1000)
+    defaults = db.scalars(
+        select(Asset).where(Asset.asset_code.in_(["frame_classic", "crown_none"]))
+    ).all()
+
+    db.query(UserAsset).filter(UserAsset.user_id == user_id).delete(synchronize_session=False)
+    db.query(CurrencyTransaction).filter(CurrencyTransaction.user_id == user_id).delete(synchronize_session=False)
+    db.query(QuizSession).filter(QuizSession.user_id == user_id).delete(synchronize_session=False)
+    db.query(AdRewardTransaction).filter(AdRewardTransaction.user_id == user_id).delete(synchronize_session=False)
+    for asset in defaults:
+        db.add(UserAsset(user_id=user_id, asset_id=asset.id, selected=True, purchased_at=now))
+
+    user.currency_balance = 3500
+    db.add(CurrencyTransaction(
+        user_id=user_id,
+        amount=3500,
+        reason="game_data_reset",
+        created_at=now,
+    ))
+    db.commit()
     return QuizActionResponse(balance=user.currency_balance)
 
 

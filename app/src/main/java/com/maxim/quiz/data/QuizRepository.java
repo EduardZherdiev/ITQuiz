@@ -566,6 +566,53 @@ public class QuizRepository {
         return prefs().getString(PREF_USER_ID, "user_test");
     }
 
+    /** Links the current anonymous session to a server-verified Play Games player. */
+    public QuizApiModels.AuthResponse linkPlayGamesAccountBlocking(String serverAuthCode) throws Exception {
+        if (serverAuthCode == null || serverAuthCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Play Games server auth code is empty");
+        }
+        QuizApiModels.AuthResponse response = withAuthenticatedAuthResponseRetries(
+                token -> remoteDataSource.linkPlayGamesAccount(token, serverAuthCode)
+        );
+        prefs().edit()
+                .putString(PREF_AUTH_TOKEN, response.accessToken)
+                .putString(PREF_USER_ID, response.userId)
+                .apply();
+        return response;
+    }
+
+    /** Resets the authoritative account and refreshes the local user snapshot. */
+    public QuizApiModels.ActionResponse resetGameDataBlocking() throws Exception {
+        QuizApiModels.ActionResponse response = withAuthenticatedRetries(
+                remoteDataSource::resetGameData
+        );
+        clearLocalAccountData(response.balance);
+        return response;
+    }
+
+    /** Removes the local session and user-specific cache without touching catalog data. */
+    public void clearLocalAccountSession() {
+        clearLocalAccountData(3500);
+        clearStoredAuth();
+    }
+
+    private void clearLocalAccountData(int balance) {
+        if (quizDatabase != null) {
+            quizDatabase.runInTransaction(() -> {
+                quizDao.clearPendingAssetOperations();
+                quizDao.clearPendingCurrencyOperations();
+                quizDao.clearOfflineQuizSessions();
+                quizDao.clearQuizSessions();
+                quizDao.clearCurrencyTransactions();
+                quizDao.clearUserAssets();
+                quizDao.clearUsers();
+            });
+        }
+        if (appContext != null) {
+            QuizApplication.setDisplayedCurrencyBalance(appContext, balance);
+        }
+    }
+
     public QuizApiModels.ActionResponse startQuiz(QuizApiModels.StartQuizRequest request) throws Exception {
         return withAuthenticatedRetries(token -> remoteDataSource.startQuiz(token, request));
     }
@@ -1017,6 +1064,10 @@ public class QuizRepository {
         QuizApiModels.ActionResponse execute(String accessToken) throws Exception;
     }
 
+    private interface AuthenticatedAuthResponseCall {
+        QuizApiModels.AuthResponse execute(String accessToken) throws Exception;
+    }
+
     private QuizApiModels.ActionResponse withAuthenticatedRetries(AuthenticatedRemoteCall call) throws Exception {
         try {
             return withNetworkRetries(() -> call.execute(authenticateIfNeeded()));
@@ -1287,6 +1338,55 @@ public class QuizRepository {
         } finally {
             TOP_UP_IN_PROGRESS.set(false);
         }
+    }
+
+    private QuizApiModels.AuthResponse withAuthenticatedAuthResponseRetries(
+            AuthenticatedAuthResponseCall call
+    ) throws Exception {
+        try {
+            return withNetworkRetriesAuthResponse(() -> call.execute(authenticateIfNeeded()));
+        } catch (Exception error) {
+            if (!isUnauthorized(error)) {
+                throw error;
+            }
+            clearStoredAuth();
+            return withNetworkRetriesAuthResponse(() -> call.execute(authenticateIfNeeded()));
+        }
+    }
+
+    private QuizApiModels.AuthResponse withNetworkRetriesAuthResponse(
+            AuthResponseRemoteCall call
+    ) throws Exception {
+        Exception lastError = null;
+        long deadline = System.nanoTime() + NETWORK_OPERATION_BUDGET_MS * 1_000_000L;
+        for (int attempt = 0; attempt < MAX_NETWORK_ATTEMPTS; attempt++) {
+            if (attempt > 0 && !NetworkState.isAvailable()) {
+                break;
+            }
+            try {
+                return call.execute();
+            } catch (Exception error) {
+                lastError = error;
+                long remainingMs = (deadline - System.nanoTime()) / 1_000_000L;
+                if (attempt == MAX_NETWORK_ATTEMPTS - 1 || remainingMs <= 0 || !NetworkState.isAvailable()) {
+                    break;
+                }
+                try {
+                    Thread.sleep(Math.min(200L, Math.max(1L, remainingMs)));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        if (lastError != null) {
+            throw lastError;
+        }
+        throw new IOException("Network is unavailable");
+    }
+
+    private interface AuthResponseRemoteCall {
+        QuizApiModels.AuthResponse execute() throws Exception;
     }
 
     private QuizApiModels.ActionResponse queueLocalTestTopUp() {

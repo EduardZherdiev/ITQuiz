@@ -42,6 +42,21 @@ public class QuizRemoteDataSource {
         return response.body();
     }
 
+    public QuizApiModels.AuthResponse linkPlayGamesAccount(
+            String accessToken,
+            String serverAuthCode
+    ) throws IOException {
+        Response<QuizApiModels.AuthResponse> response = bootstrapApiService
+                .linkPlayGamesAccount(
+                        bearer(accessToken),
+                        new QuizApiModels.PlayGamesLinkRequest(serverAuthCode)
+                ).execute();
+        if (!response.isSuccessful() || response.body() == null) {
+            throw new IOException("Play Games account link failed: HTTP " + response.code());
+        }
+        return response.body();
+    }
+
     public BootstrapDto fetchBootstrap(String accessToken) throws IOException {
         return fetchBootstrap(accessToken, "en");
     }
@@ -68,6 +83,10 @@ public class QuizRemoteDataSource {
 
     public QuizApiModels.ActionResponse fetchBalance(String accessToken) throws IOException {
         return executeAction(apiService.getBalance(bearer(accessToken)), "Balance request failed");
+    }
+
+    public QuizApiModels.ActionResponse resetGameData(String accessToken) throws IOException {
+        return executeAction(apiService.resetGameData(bearer(accessToken)), "Reset game data failed");
     }
 
     public QuizApiModels.ActionResponse verifyGooglePlayPurchase(

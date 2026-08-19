@@ -14,6 +14,12 @@ public interface QuizApiService {
     @POST("api/v1/auth/anonymous")
     Call<QuizApiModels.AuthResponse> authenticate(@Body QuizApiModels.AuthRequest request);
 
+    @POST("api/v1/auth/play-games/link")
+    Call<QuizApiModels.AuthResponse> linkPlayGamesAccount(
+            @Header("Authorization") String authorization,
+            @Body QuizApiModels.PlayGamesLinkRequest request
+    );
+
     @GET("api/v1/bootstrap")
     Call<BootstrapDto> getBootstrap(
             @Header("Authorization") String authorization,
@@ -34,6 +40,11 @@ public interface QuizApiService {
 
     @GET("api/v1/me/balance")
     Call<QuizApiModels.ActionResponse> getBalance(
+            @Header("Authorization") String authorization
+    );
+
+    @POST("api/v1/me/reset")
+    Call<QuizApiModels.ActionResponse> resetGameData(
             @Header("Authorization") String authorization
     );
 

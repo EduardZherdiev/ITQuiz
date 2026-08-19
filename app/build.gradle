@@ -6,6 +6,8 @@ def quizApiBaseUrl = project.findProperty("QUIZ_API_BASE_URL") ?: "http://10.0.2
 def admobAppId = project.findProperty("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713"
 def rewardedAdUnitId = project.findProperty("REWARDED_AD_UNIT_ID") ?: "ca-app-pub-3940256099942544/5224354917"
 def rewardedServerSource = project.findProperty("REWARDED_SERVER_SOURCE")
+def pgsGameProjectId = project.findProperty("PGS_GAME_PROJECT_ID") ?: "0"
+def pgsServerClientId = project.findProperty("PGS_SERVER_CLIENT_ID") ?: ""
 
 android {
     namespace 'com.maxim.quiz'
@@ -23,9 +25,13 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField "String", "PGS_GAME_PROJECT_ID", '"' + pgsGameProjectId + '"'
+            buildConfigField "String", "PGS_SERVER_CLIENT_ID", '"' + pgsServerClientId + '"'
             buildConfigField "String", "REWARDED_SERVER_SOURCE", '"' + (rewardedServerSource ?: "ad_test") + '"'
         }
         release {
+            buildConfigField "String", "PGS_GAME_PROJECT_ID", '"' + pgsGameProjectId + '"'
+            buildConfigField "String", "PGS_SERVER_CLIENT_ID", '"' + pgsServerClientId + '"'
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             buildConfigField "String", "REWARDED_SERVER_SOURCE", '"' + (rewardedServerSource ?: "ad_ssv") + '"'
@@ -38,9 +44,11 @@ android {
     buildFeatures {
         viewBinding true
         buildConfig true
+        resValues true
     }
 
     defaultConfig {
+        resValue "string", "game_services_project_id", pgsGameProjectId
         buildConfigField "String", "QUIZ_API_BASE_URL", '"' + quizApiBaseUrl + '"'
         buildConfigField "String", "ADMOB_APP_ID", '"' + admobAppId + '"'
         buildConfigField "String", "REWARDED_AD_UNIT_ID", '"' + rewardedAdUnitId + '"'
@@ -67,6 +75,7 @@ dependencies {
     implementation libs.okhttp.logging.interceptor
     implementation libs.google.mobile.ads
     implementation libs.play.billing
+    implementation libs.play.games
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core

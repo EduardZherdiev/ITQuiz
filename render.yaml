@@ -30,6 +30,10 @@ services:
         value: "*"
       - key: GOOGLE_PLAY_PACKAGE_NAME
         value: com.maxim.quiz
+      - key: GOOGLE_PLAY_SERVER_CLIENT_ID
+        sync: false
+      - key: GOOGLE_PLAY_SERVER_CLIENT_SECRET
+        sync: false
       - key: QUIZ_REWARDED_AD_UNIT_ID
         sync: false
       - key: GOOGLE_PLAY_SERVICE_ACCOUNT_FILE

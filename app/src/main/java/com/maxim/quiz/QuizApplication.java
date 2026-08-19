@@ -23,6 +23,7 @@ public class QuizApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        PlayGamesAccountManager.initialize(this);
         NetworkState.initialize(this);
         applySavedLanguage();
         ensureInitialCurrencyBalance();

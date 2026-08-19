@@ -18,6 +18,7 @@ public class MainActivity extends AppCompatActivity {
                 + NetworkState.isAvailable() + ", displayedBalance="
                 + QuizApplication.getCurrencyBalance(this));
         setContentView(R.layout.activity_main);
+        PlayGamesAccountManager.attemptAutomaticLink(this);
         HeroImageLoader.load(findViewById(R.id.mainHeroImage));
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
@@ -82,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        PlayGamesAccountManager.attemptAutomaticLink(this);
         TextView mainCurrencyTopValue = findViewById(R.id.currencyTopValue);
         updateMainCurrency(mainCurrencyTopValue);
         updateMainProfileIcon(findViewById(R.id.mainTopLeftProfile), findViewById(R.id.mainTopLeftIcon), findViewById(R.id.mainTopLeftCrown));

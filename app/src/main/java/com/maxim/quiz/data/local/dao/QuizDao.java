@@ -83,6 +83,9 @@ public interface QuizDao {
     @Query("DELETE FROM pending_asset_operations WHERE operation_id = :operationId")
     void deletePendingAssetOperation(String operationId);
 
+    @Query("DELETE FROM pending_asset_operations")
+    void clearPendingAssetOperations();
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsertPendingCurrencyOperation(PendingCurrencyOperationEntity operation);
 
@@ -98,6 +101,9 @@ public interface QuizDao {
     @Query("DELETE FROM pending_currency_operations WHERE operation_id = :operationId")
     void deletePendingCurrencyOperation(String operationId);
 
+    @Query("DELETE FROM pending_currency_operations")
+    void clearPendingCurrencyOperations();
+
     @Query("SELECT * FROM offline_quiz_sessions WHERE id = :sessionId LIMIT 1")
     OfflineQuizSessionEntity getOfflineQuizSession(String sessionId);
 
@@ -112,6 +118,9 @@ public interface QuizDao {
 
     @Query("DELETE FROM offline_quiz_sessions WHERE id = :sessionId")
     void deleteOfflineQuizSession(String sessionId);
+
+    @Query("DELETE FROM offline_quiz_sessions")
+    void clearOfflineQuizSessions();
 
     @Query("UPDATE users SET currency_balance = :balance WHERE id = :userId")
     void updateUserCurrencyBalance(String userId, int balance);
