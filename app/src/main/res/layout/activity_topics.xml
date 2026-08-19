@@ -8,7 +8,7 @@
     android:background="?attr/colorSurface"
     tools:context=".TopicsActivity">
 
-    <com.maxim.quiz.ui.AutoFitGridRecyclerView
+    <com.maxim.itquiz.ui.AutoFitGridRecyclerView
         android:id="@+id/topicsRecyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"

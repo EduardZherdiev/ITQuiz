@@ -115,7 +115,7 @@
                         android:paddingEnd="2dp"
                         android:textColor="@android:color/white"
                         android:textSize="6sp"
-                        tools:text="Max Tester" />
+                        tools:text="Guest" />
 
                     <ImageView
                         android:id="@+id/questionPlayerCrown"
@@ -241,7 +241,7 @@
                 android:paddingEnd="2dp"
                 android:textColor="@android:color/white"
                 android:textSize="6sp"
-                tools:text="Max Tester" />
+                tools:text="Guest" />
 
             <ImageView
                 android:id="@+id/soloUserCrown"

@@ -42,7 +42,7 @@
             android:paddingEnd="3dp"
             android:textColor="@android:color/white"
             android:textSize="7sp"
-            tools:text="Max Tester" />
+            tools:text="Guest" />
     </FrameLayout>
 
     <ImageView

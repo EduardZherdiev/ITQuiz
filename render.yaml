@@ -29,7 +29,7 @@ services:
       - key: QUIZ_ALLOWED_ORIGINS
         value: "*"
       - key: GOOGLE_PLAY_PACKAGE_NAME
-        value: com.maxim.quiz
+        value: com.maxim.itquiz
       - key: GOOGLE_PLAY_SERVER_CLIENT_ID
         sync: false
       - key: GOOGLE_PLAY_SERVER_CLIENT_SECRET

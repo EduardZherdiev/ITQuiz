@@ -10,11 +10,11 @@ def pgsGameProjectId = project.findProperty("PGS_GAME_PROJECT_ID") ?: "0"
 def pgsServerClientId = project.findProperty("PGS_SERVER_CLIENT_ID") ?: ""
 
 android {
-    namespace 'com.maxim.quiz'
+    namespace 'com.maxim.itquiz'
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.maxim.quiz"
+        applicationId "com.maxim.itquiz"
         minSdk 29
         targetSdk 34
         versionCode 1

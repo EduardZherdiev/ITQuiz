@@ -196,6 +196,7 @@ GitHub: github.com/example/quiz</string>
     <string name="explanation_selected_prefix">Ваш ответ: %1$s</string>
     <string name="explanation_correct_prefix">Правильный ответ: %1$s</string>
     <string name="settings_category_app">Приложение</string>
+    <string name="default_guest_name">Guest</string>
     <string name="settings_category_account">Аккаунт</string>
     <string name="settings_google_play_title">Google Play Games</string>
     <string name="settings_google_play_connected">Подключен</string>
@@ -263,6 +264,6 @@ GitHub: github.com/example/quiz</string>
     <string name="settings_user_name_summary">Имя: %1$s</string>
     <string name="settings_user_name_empty_error">Имя не может быть пустым</string>
     <string name="share_app_message">Я играю в %1$s. Присоединяйтесь!\n%2$s</string>
-    <string name="share_app_link">https://play.google.com/store/apps/details?id=com.maxim.quiz</string>
+    <string name="share_app_link">https://play.google.com/store/apps/details?id=com.maxim.itquiz</string>
     <string name="share_chooser_title">Поделиться через</string>
 </resources>

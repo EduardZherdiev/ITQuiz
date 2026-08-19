@@ -157,7 +157,7 @@ def seed_database(session: Session) -> None:
             Asset(id=8, asset_type="CROWN", asset_code="crown_brilliant", price=6500, is_active=True),
         ]
         user = User(id="user_test", google_uid="seed-user", email="user@example.com",
-                    display_name="Quiz Player", photo_url=None, currency_balance=3500, last_login_at=now)
+                    display_name="Guest", photo_url=None, currency_balance=3500, last_login_at=now)
         user_assets = [
             UserAsset(user_id=user.id, asset_id=1, selected=True, purchased_at=now),
             UserAsset(user_id=user.id, asset_id=4, selected=True, purchased_at=now),
@@ -191,6 +191,13 @@ def seed_database(session: Session) -> None:
         session.commit()
 
     ensure_localized_texts(session)
+    legacy_guest_users = session.scalars(
+        select(User).where(User.display_name.in_(["Quiz Player", "Max Tester"]))
+    ).all()
+    for legacy_user in legacy_guest_users:
+        legacy_user.display_name = "Guest"
+    if legacy_guest_users:
+        session.commit()
 
 
 def ensure_localized_texts(session: Session) -> None:

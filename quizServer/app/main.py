@@ -8,7 +8,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -96,7 +97,7 @@ def anonymous_auth(payload: AnonymousAuthRequest, db: Session = Depends(get_db))
         user = User(
             id=f"anon_{uuid.uuid4().hex}",
             google_uid=google_uid,
-            display_name="Quiz Player",
+            display_name="Guest",
             currency_balance=3500,
             last_login_at=now,
         )
@@ -145,8 +146,8 @@ def link_play_games_account(
 
     # The player API may omit profile data. Do not overwrite the app name with
     # an empty value; the stable playerId is the actual account identity.
-    if not user.display_name or user.display_name == "Quiz Player":
-        user.display_name = player.get("displayName") or user.display_name or "Quiz Player"
+    if not user.display_name or user.display_name in {"Quiz Player", "Max Tester"}:
+        user.display_name = player.get("displayName") or user.display_name or "Guest"
     user.last_login_at = int(time.time() * 1000)
     db.commit()
 
@@ -200,13 +201,22 @@ def _verify_play_games_server_auth_code(server_auth_code: str) -> dict:
 
 @app.get("/api/v1/bootstrap", response_model=BootstrapResponse)
 def bootstrap(
+    response: Response,
     user_id: str = Depends(require_user),
     db: Session = Depends(get_db),
     accept_language: str | None = Header(default=None),
 ):
     _require_user(db, user_id)
     language = (accept_language or "en").split(",", 1)[0].strip().lower().split("-", 1)[0]
-    return build_bootstrap_payload(db, user_id, language)
+    payload = build_bootstrap_payload(db, user_id, language)
+    # Render may gzip/chunk the response, which removes the useful HTTP
+    # Content-Length for the Android client. Publish the exact uncompressed
+    # JSON size in a stable header so the startup screen can show MB/MB.
+    encoded = jsonable_encoder(payload)
+    body = json.dumps(encoded, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if response is not None:
+        response.headers["X-Bootstrap-Content-Length"] = str(len(body))
+    return payload
 
 
 @app.post("/api/v1/me/currency/top-up", response_model=QuizActionResponse)
@@ -325,7 +335,7 @@ def verify_google_play_purchase(
             scopes=["https://www.googleapis.com/auth/androidpublisher"],
         )
         publisher = build("androidpublisher", "v3", credentials=credentials, cache_discovery=False)
-        package_name = os.getenv("GOOGLE_PLAY_PACKAGE_NAME", "com.maxim.quiz")
+        package_name = os.getenv("GOOGLE_PLAY_PACKAGE_NAME", "com.maxim.itquiz")
         google_purchase = publisher.purchases().products().get(
             packageName=package_name,
             productId=payload.product_id,
