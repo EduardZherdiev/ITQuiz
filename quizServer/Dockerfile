@@ -6,6 +6,8 @@ COPY requirements.txt requirements-payments.txt ./
 RUN pip install --no-cache-dir -r requirements-payments.txt
 
 COPY app ./app
+COPY content ./content
+COPY scripts ./scripts
 
 EXPOSE 10000
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]

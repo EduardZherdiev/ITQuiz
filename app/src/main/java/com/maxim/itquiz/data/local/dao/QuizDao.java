@@ -170,13 +170,16 @@ public interface QuizDao {
     @Query("SELECT COUNT(*) FROM option_texts WHERE language_code = :language")
     int countOptionTextsForLanguage(String language);
 
-    @Query("SELECT t.* FROM topics t WHERE t.is_active = 1 ORDER BY t.code")
+    // Keep the same deterministic order as the server bootstrap and bundled
+    // catalog. Sorting by code made ALL and ALGO swap when Room replaced the
+    // immediate fallback list with the database result.
+    @Query("SELECT t.* FROM topics t WHERE t.is_active = 1 ORDER BY CAST(t.id AS INTEGER), t.code")
     LiveData<List<TopicEntity>> observeActiveTopics();
 
-    @Query("SELECT t.id AS topicId, t.code AS code, t.icon_url AS iconUrl, COALESCE(tt.title, t.code) AS title, COALESCE(tt.description, '') AS description, COALESCE(tt.abbr, t.code) AS abbr FROM topics t LEFT JOIN topic_texts tt ON tt.topic_id = t.id AND tt.language_code = :lang WHERE t.is_active = 1 ORDER BY t.code")
+    @Query("SELECT t.id AS topicId, t.code AS code, t.icon_url AS iconUrl, COALESCE(tt.title, t.code) AS title, COALESCE(tt.description, '') AS description, COALESCE(tt.abbr, t.code) AS abbr FROM topics t LEFT JOIN topic_texts tt ON tt.topic_id = t.id AND tt.language_code = :lang WHERE t.is_active = 1 ORDER BY CAST(t.id AS INTEGER), t.code")
     LiveData<List<TopicCardRow>> observeTopicCards(String lang);
 
-    @Query("SELECT * FROM topics WHERE is_active = 1 ORDER BY code")
+    @Query("SELECT * FROM topics WHERE is_active = 1 ORDER BY CAST(id AS INTEGER), code")
     List<TopicEntity> getActiveTopics();
 
     @Query("SELECT qt.* FROM question_texts qt INNER JOIN questions q ON q.id = qt.question_id WHERE q.topic_id = :topicId AND q.difficulty = :difficulty AND qt.language_code = :lang AND q.is_active = 1 ORDER BY q.id")
@@ -215,14 +218,26 @@ public interface QuizDao {
     @Query("DELETE FROM option_texts")
     void clearOptionTexts();
 
+    @Query("DELETE FROM option_texts WHERE option_id NOT IN (:optionIds)")
+    void deleteOptionTextsExceptOptionIds(List<String> optionIds);
+
     @Query("DELETE FROM options")
     void clearOptions();
+
+    @Query("DELETE FROM options WHERE id NOT IN (:optionIds)")
+    void deleteOptionsExceptIds(List<String> optionIds);
 
     @Query("DELETE FROM question_texts")
     void clearQuestionTextsForSync();
 
+    @Query("DELETE FROM question_texts WHERE question_id NOT IN (:questionIds)")
+    void deleteQuestionTextsExceptQuestionIds(List<String> questionIds);
+
     @Query("DELETE FROM questions")
     void clearQuestions();
+
+    @Query("DELETE FROM questions WHERE id NOT IN (:questionIds)")
+    void deleteQuestionsExceptIds(List<String> questionIds);
 
     @Query("DELETE FROM topic_texts")
     void clearTopicTexts();

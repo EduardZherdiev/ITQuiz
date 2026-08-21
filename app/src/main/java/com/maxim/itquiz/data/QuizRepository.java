@@ -1721,9 +1721,38 @@ public class QuizRepository {
             return;
         }
 
-        quizDao.upsertQuestions(mapQuestions(bootstrap.questions));
+        List<QuestionEntity> mappedQuestions = mapQuestions(bootstrap.questions);
+        List<OptionEntity> mappedOptions = mapOptions(bootstrap.options);
+        if (mappedQuestions.isEmpty()) {
+            quizDao.clearOptionTexts();
+            quizDao.clearOptions();
+            quizDao.clearQuestionTextsForSync();
+            quizDao.clearQuestions();
+        } else {
+            List<String> questionIds = new ArrayList<>();
+            for (QuestionEntity question : mappedQuestions) {
+                questionIds.add(question.id);
+            }
+            if (mappedOptions.isEmpty()) {
+                quizDao.clearOptionTexts();
+                quizDao.clearOptions();
+            } else {
+                List<String> optionIds = new ArrayList<>();
+                for (OptionEntity option : mappedOptions) {
+                    optionIds.add(option.id);
+                }
+                // Bootstrap is a complete server snapshot. Remove records
+                // from an older catalog before upserting the new snapshot.
+                quizDao.deleteOptionTextsExceptOptionIds(optionIds);
+                quizDao.deleteOptionsExceptIds(optionIds);
+            }
+            quizDao.deleteQuestionTextsExceptQuestionIds(questionIds);
+            quizDao.deleteQuestionsExceptIds(questionIds);
+        }
+
+        quizDao.upsertQuestions(mappedQuestions);
         quizDao.upsertQuestionTexts(mapQuestionTexts(bootstrap.questionTexts));
-        quizDao.upsertOptions(mapOptions(bootstrap.options));
+        quizDao.upsertOptions(mappedOptions);
         quizDao.upsertOptionTexts(mapOptionTexts(bootstrap.optionTexts));
     }
 

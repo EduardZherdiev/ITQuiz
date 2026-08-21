@@ -20,6 +20,7 @@ import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import android.view.animation.LinearInterpolator;
@@ -51,6 +52,7 @@ public class QuestionActivity extends AppCompatActivity {
     private static final String STATE_SELECTED_ANSWERS = "state_selected_answers";
     private static final String STATE_TIMER_DEADLINE = "state_timer_deadline";
     private static final String STATE_TIMER_QUESTION_INDEX = "state_timer_question_index";
+    private static final String STATE_QUESTION_ORDER = "state_question_order";
     public static final String EXTRA_SESSION_ID = "extra_session_id";
     public static final String EXTRA_REVIEW_LINES = "extra_review_lines";
     private static final String EXTRA_SCORE = "extra_score";
@@ -106,6 +108,7 @@ public class QuestionActivity extends AppCompatActivity {
     private long questionTimerDeadlineElapsedRealtime;
     private int timerQuestionIndex = -1;
     private boolean restoringQuestionState;
+    private ArrayList<String> questionOrder = new ArrayList<>();
     private Runnable computerAnswerRunnable;
     private Runnable nextQuestionRunnable;
     private boolean answerLocked;
@@ -262,10 +265,31 @@ public class QuestionActivity extends AppCompatActivity {
                 }
                 android.util.Log.d("QuestionActivity", "setUpQuestions: qTexts count=" + (qTexts != null ? qTexts.size() : 0));
                 if (qTexts != null && !qTexts.isEmpty()) {
+                    if (questionOrder == null || questionOrder.isEmpty()) {
+                        Collections.shuffle(qTexts);
+                    } else {
+                        java.util.Map<String, QuestionTextEntity> byId = new java.util.HashMap<>();
+                        for (QuestionTextEntity questionText : qTexts) {
+                            byId.put(questionText.questionId, questionText);
+                        }
+                        List<QuestionTextEntity> restoredOrder = new ArrayList<>();
+                        for (String questionId : questionOrder) {
+                            QuestionTextEntity questionText = byId.remove(questionId);
+                            if (questionText != null) {
+                                restoredOrder.add(questionText);
+                            }
+                        }
+                        // Preserve newly downloaded questions if the catalog
+                        // changed while this activity was being recreated.
+                        restoredOrder.addAll(byId.values());
+                        qTexts = restoredOrder;
+                    }
                     questions.clear();
                     int limit = Math.min(qTexts.size(), questionLimit > 0 ? questionLimit : qTexts.size());
+                    questionOrder.clear();
                     for (int i = 0; i < limit; i++) {
                         QuestionTextEntity qt = qTexts.get(i);
+                        questionOrder.add(qt.questionId);
                         List<OptionEntity> options = database.quizDao().getOptionsByQuestionId(qt.questionId);
                         String[] optionTexts = new String[options.size()];
                         int correctIndex = -1;
@@ -626,6 +650,10 @@ public class QuestionActivity extends AppCompatActivity {
         nextQuestionScheduled = savedInstanceState.getBoolean(STATE_NEXT_QUESTION_SCHEDULED, false);
         answerLocked = savedInstanceState.getBoolean(STATE_ANSWER_LOCKED, false);
         selectedAnswerIndexes = savedInstanceState.getIntArray(STATE_SELECTED_ANSWERS);
+        questionOrder = savedInstanceState.getStringArrayList(STATE_QUESTION_ORDER);
+        if (questionOrder == null) {
+            questionOrder = new ArrayList<>();
+        }
         questionTimerDeadlineElapsedRealtime = savedInstanceState.getLong(STATE_TIMER_DEADLINE, 0L);
         timerQuestionIndex = savedInstanceState.getInt(STATE_TIMER_QUESTION_INDEX, -1);
         restoringQuestionState = true;
@@ -641,6 +669,7 @@ public class QuestionActivity extends AppCompatActivity {
         outState.putBoolean(STATE_NEXT_QUESTION_SCHEDULED, nextQuestionScheduled);
         outState.putBoolean(STATE_ANSWER_LOCKED, answerLocked);
         outState.putIntArray(STATE_SELECTED_ANSWERS, selectedAnswerIndexes);
+        outState.putStringArrayList(STATE_QUESTION_ORDER, questionOrder);
         outState.putLong(STATE_TIMER_DEADLINE, questionTimerDeadlineElapsedRealtime);
         outState.putInt(STATE_TIMER_QUESTION_INDEX, timerQuestionIndex);
         super.onSaveInstanceState(outState);

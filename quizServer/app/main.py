@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import uuid
+from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
@@ -32,6 +33,7 @@ from app.schemas import (
     TopUpCurrencyRequest,
 )
 from app.seed import build_bootstrap_payload, seed_database
+from scripts.import_questions import delete_all_questions, import_content
 
 
 app = FastAPI(title="Quiz Server", version="1.1.0")
@@ -79,8 +81,35 @@ def on_startup() -> None:
     db = SessionLocal()
     try:
         seed_database(db)
+        if os.getenv("QUIZ_CONTENT_AUTO_IMPORT", "0") == "1":
+            import_packaged_questions(db)
     finally:
         db.close()
+
+
+def import_packaged_questions(db: Session) -> None:
+    """Publish the versioned question catalog shipped with the server image."""
+    content_dir = Path(__file__).resolve().parent.parent / "content"
+    content_files = [
+        content_dir / "algo_questions.json",
+        content_dir / "algo_questions_common.json",
+        content_dir / "algo_questions_advanced.json",
+    ]
+    if not all(path.is_file() for path in content_files):
+        logger.warning("Packaged question catalog is incomplete; keeping existing questions")
+        return
+
+    delete_all_questions(db)
+    totals = [0, 0, 0]
+    for content_file in content_files:
+        payload = json.loads(content_file.read_text(encoding="utf-8"))
+        counts = import_content(db, payload)
+        totals = [left + right for left, right in zip(totals, counts)]
+    db.commit()
+    logger.info(
+        "Packaged question catalog imported: topics=%s questions=%s options=%s",
+        totals[0], totals[1], totals[2],
+    )
 
 
 @app.get("/health")

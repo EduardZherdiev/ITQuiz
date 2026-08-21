@@ -24,7 +24,7 @@ from app.translations import localized_fact, localized_topic
 
 
 LANGUAGE_CODE = "en"
-SERVER_REVISION = 3
+SERVER_REVISION = 4
 QUESTION_COUNTS = {"basic": 10, "common": 15, "advanced": 20}
 
 

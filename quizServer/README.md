@@ -84,3 +84,33 @@ crediting coins and consumes the product afterward.
 The local-only test top-up endpoint is controlled by
 `QUIZ_ENABLE_TEST_TOPUPS`; keep it at `1` only for development and set it to
 `0` before exposing the server publicly.
+
+## Importing questions
+
+Questions are imported by an administrator from a JSON file. The example file
+is `content/questions.example.json`. When adding questions to an existing
+topic, only its `code` and `questions` are needed; the topic's existing name,
+abbreviation, and description are preserved. Topic translations are needed
+only when creating or changing a topic. The format supports question
+translations, explanations, four answer options, and exactly one correct
+option. Supported languages are `en`, `ru`, and `uk`; English is required for
+each question and option.
+
+Validate without changing the database:
+
+```bash
+python -m scripts.import_questions content/questions.example.json --dry-run
+```
+
+Import into the database selected by `DATABASE_URL`:
+
+```bash
+python -m scripts.import_questions content/questions.json
+```
+
+For Render, copy the Postgres connection string from the database's Connect
+menu, set it only in the local shell as `DATABASE_URL`, and run the importer
+from this directory. Do not set `QUIZ_RESET_DB_ON_STARTUP=1`; that option is
+for intentionally rebuilding a development database. Supplying numeric `id`
+values makes later imports update the same questions and options instead of
+creating duplicates.

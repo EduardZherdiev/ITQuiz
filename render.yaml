@@ -24,6 +24,8 @@ services:
         generateValue: true
       - key: QUIZ_RESET_DB_ON_STARTUP
         value: "0"
+      - key: QUIZ_CONTENT_AUTO_IMPORT
+        value: "1"
       - key: QUIZ_ENABLE_TEST_TOPUPS
         value: "1"
       - key: QUIZ_ALLOWED_ORIGINS
